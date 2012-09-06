@@ -21,8 +21,6 @@ public class FileOperationSplitterTest {
 
     //TODO: Confirm proper calling of EventListeners
     //TODO: Confirm invalid parameter exceptions
-    //TODO: Insert mechanism for aborting midstream and then continuing where it left off
-    //TODO: Confirm cleanup of temporary files
 
     @BeforeSuite
     public void setup() {
@@ -163,13 +161,49 @@ public class FileOperationSplitterTest {
         deleteFile(inputFileWithPrecisePartitionSizeMultiple);
     }
 
-    //@Test
+    @Test
     public void testAbortRecovery () throws IOException, FilePartException {
 
-        //FileCopyOperator fco = testCopyFile("testFileWithPrecisePartitionSizeMultiple", inputFileWithPrecisePartitionSizeMultiple);
-        int totalInvocations = (int)(inputFileWithRemainder.length() / PART_SIZE);
+        File outFile = null;
+        String jobId = "testAbortRecovery";
+        File srcFile = inputFileWithPrecisePartitionSizeMultiple;
 
-        //fco.setAbortOnInvocationNumber((int)(totalInvocations / 2));
+        try {
+            outFile = File.createTempFile(jobId, ".out");
+            int expectedInvocations = (int)(srcFile.length() / PART_SIZE);
+
+            FileCopyOperator fco = new FileCopyOperator(outFile);
+            fco.setAbortOnInvocationNumber((int)(expectedInvocations / 2));
+            try {
+                testCopyFile(jobId, srcFile, fco);
+            } catch (RuntimeException rte) {
+                // Make sure we actually aborted after 5 tries, with the right message
+                Assert.assertEquals(fco.getNumInvocationsFilePartOperation(),(int)(expectedInvocations / 2));
+                Assert.assertTrue(rte.getMessage().startsWith("Intentionally throwing exception"));
+
+                // Now retry again
+                fco = new FileCopyOperator(outFile); // Reopens the file stream.
+                testCopyFile(jobId, srcFile, fco);
+
+                // The second set of invocations should 1 more than half, since it includes the retry.
+                Assert.assertEquals(fco.getNumInvocationsFilePartOperation(), ((int)(expectedInvocations / 2)+1));
+
+                // Make sure no temporary files got left behind
+                File[] fileListing = inputFileWithPrecisePartitionSizeMultiple.getParentFile().listFiles();
+                for (File f : fileListing) {
+                    String name = f.getName();
+                    if (name.endsWith(jobId + ".ptracker")) {
+                        throw new RuntimeException("Unexpected temp file found : " + f.getAbsolutePath());
+                    }
+                }
+            }
+
+            Assert.assertEquals(fco.getNumInvocationsFullFileOperation(), 0);
+        } finally {
+            if (outFile != null) {
+                outFile.delete();
+            }
+        }
     }
 
     private void deleteFile(File file) {

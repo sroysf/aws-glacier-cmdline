@@ -78,7 +78,7 @@ public class FileOperationSplitter {
                 int startPartNum = determineStartingPartNumber();
                 int numParts = (int)(srcFileLength / partitionSize);
 
-                for (int i=(startPartNum-1); i < numParts; i++) {
+                for (int i=(startPartNum+1); i < numParts; i++) {
                     loadByteRange(buffer, (i * partitionSize), partitionSize);
 
                     FilePart filePart = new FilePart(srcFile, buffer, i, partitionSize);
@@ -131,9 +131,13 @@ public class FileOperationSplitter {
 
     }
 
-    private int determineStartingPartNumber() {
-        //TODO: Implement this for real so that it can pick up where it left off
-        return 1;
+    private int determineStartingPartNumber() throws IOException {
+        String fileContents = FileUtils.readFileToString(partTrackerFile);
+        if (fileContents.length() == 0) {
+            return -1;
+        } else {
+            return Integer.parseInt(fileContents.trim());
+        }
     }
 
     private byte[] loadByteRange(byte[] buffer, long offset, int numBytes) throws IOException {

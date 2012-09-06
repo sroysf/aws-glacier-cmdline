@@ -14,7 +14,7 @@ import java.io.*;
 public class FileCopyOperator implements FilePartOperator {
 
     private File outfile;
-    private OutputStream fos = null;
+    private RandomAccessFile fos = null;
     private int numInvocationsFilePartOperation = 0;
     private int numInvocationsFullFileOperation = 0;
     private int abortOnInvocationNumber = 0;
@@ -22,7 +22,7 @@ public class FileCopyOperator implements FilePartOperator {
     public FileCopyOperator(File outfile) {
         this.outfile = outfile;
         try {
-            fos = new FileOutputStream(outfile);
+            fos = new RandomAccessFile(outfile, "rw");
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
         }
@@ -48,6 +48,7 @@ public class FileCopyOperator implements FilePartOperator {
 
     private void writeFilePart(FilePart filePart) {
         try {
+            fos.skipBytes(filePart.getPartNum() * filePart.getNumBytes());
             fos.write(filePart.getBuffer(), 0, filePart.getNumBytes());
         } catch (IOException e) {
             e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
