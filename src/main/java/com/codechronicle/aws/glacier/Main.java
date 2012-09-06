@@ -5,14 +5,12 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.PropertiesCredentials;
 import com.amazonaws.services.glacier.AmazonGlacierClient;
 import com.amazonaws.services.glacier.model.*;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.List;
 import java.util.Properties;
 
@@ -21,10 +19,71 @@ public class Main {
 
     private static Logger log = LoggerFactory.getLogger(Main.class);
 
-	/**
+    private static int ONE_MEGABYTE = 1024 * 1024;
+    private static int PART_SIZE = ONE_MEGABYTE * 16;
+
+    public static void main(String[] args) throws IOException, FilePartException {
+
+    }
+
+    public static void mainX(String[] args) {
+        File f = new File("/home/saptarshi.roy/Downloads/ubuntu-10.04.4-server-amd64.iso");
+
+        // First, decide on part size
+        if (f.length() < PART_SIZE) {
+            // Just upload it all at once
+        } else {
+            // Do a multi-part upload
+            uploadMultiPart(f);
+        }
+
+        System.out.println(f.length());
+    }
+
+    private static void uploadMultiPart(File f) {
+        int numParts = (int)(f.length() / PART_SIZE);
+        System.out.println("Num parts = " + numParts);
+        byte[] buffer = new byte[PART_SIZE];
+
+        RandomAccessFile raf = null;
+        FileOutputStream os = null;
+        try {
+            File outfile = new File("/tmp/testOutput.txt");
+            os = new FileOutputStream(outfile);
+
+            raf = new RandomAccessFile(f, "r");
+
+            for (int i=0; i<numParts; i++) {
+                System.out.println("Part " + i + " = " + i);
+                raf.seek(i * PART_SIZE);
+                raf.read(buffer);
+                os.write(buffer);
+            }
+
+            int finalPartStart = (numParts * PART_SIZE);
+            long finalPartSize = f.length() - finalPartStart;
+            raf.seek(finalPartStart);
+            raf.read(buffer, 0, (int)finalPartSize);
+            os.write(buffer, 0, (int)finalPartSize);
+
+        } catch (Exception e) {
+            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+        } finally {
+            if (raf != null) IOUtils.closeQuietly(raf);
+            if (os != null) IOUtils.closeQuietly(os);
+        }
+    }
+
+    private static void uploadPart(RandomAccessFile raf, int partNum, int partSize) {
+
+        long filePointerLocation = partNum * partSize;
+
+    }
+
+    /**
 	 * @param args
 	 */
-	public static void main(String[] args) throws Exception {
+	public static void testListVaults(String[] args) throws Exception {
 
         Properties props = loadAWSCredentials();
         AWSCredentials credentials = new BasicAWSCredentials(props.getProperty("accessKey"), props.getProperty("secretKey"));
