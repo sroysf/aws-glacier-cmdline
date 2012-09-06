@@ -14,7 +14,10 @@ import java.io.*;
 public class FileCopyOperator implements FilePartOperator {
 
     private File outfile;
-    OutputStream fos = null;
+    private OutputStream fos = null;
+    private int numInvocationsFilePartOperation = 0;
+    private int numInvocationsFullFileOperation = 0;
+    private int abortOnInvocationNumber = 0;
 
     public FileCopyOperator(File outfile) {
         this.outfile = outfile;
@@ -27,12 +30,18 @@ public class FileCopyOperator implements FilePartOperator {
 
     @Override
     public void executeFilePartOperation(FilePart filePart) throws FilePartException {
+        numInvocationsFilePartOperation++;
         System.out.println("Executing file part operation, PART # : " + filePart.getPartNum() + ", bytes=" + filePart.getNumBytes());
         writeFilePart(filePart);
+
+        if (abortOnInvocationNumber == numInvocationsFilePartOperation) {
+            throw new RuntimeException("Intentionally throwing exception on invocation #" + abortOnInvocationNumber);
+        }
     }
 
     @Override
     public void executeFullFileOperation(FilePart filePart) {
+        numInvocationsFullFileOperation++;
         System.out.println("Executing full file operation, num bytes = " + filePart.getNumBytes());
         writeFilePart(filePart);
     }
@@ -48,5 +57,21 @@ public class FileCopyOperator implements FilePartOperator {
     @Override
     public void close() {
         IOUtils.closeQuietly(fos);
+    }
+
+    public int getNumInvocationsFilePartOperation() {
+        return numInvocationsFilePartOperation;
+    }
+
+    public int getNumInvocationsFullFileOperation() {
+        return numInvocationsFullFileOperation;
+    }
+
+    public void setAbortOnInvocationNumber(int abortOnInvocationNumber) {
+        this.abortOnInvocationNumber = abortOnInvocationNumber;
+    }
+
+    public File getOutfile() {
+        return outfile;
     }
 }

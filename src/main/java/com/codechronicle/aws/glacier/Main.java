@@ -12,5 +12,13 @@ public class Main {
 
     public static void main(String[] args) throws IOException, FilePartException {
         System.out.println("Hello world");
+
+        try {
+            if (true) {
+                throw new IOException("Testing");
+            }
+        } finally {
+            System.out.println("Testing catch");
+        }
     }
 }

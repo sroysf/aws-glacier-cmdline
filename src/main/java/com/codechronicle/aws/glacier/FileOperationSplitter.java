@@ -88,9 +88,13 @@ public class FileOperationSplitter {
                 // Now do the final part.
                 int finalPartStart = (numParts * partitionSize);
                 int finalPartSize = (int)(srcFileLength - finalPartStart);
-                loadByteRange(buffer, finalPartStart, finalPartSize);
-                FilePart lastPart = new FilePart(srcFile, buffer, numParts, finalPartSize);
-                delegateFilePartOperation(numParts, lastPart);
+
+                // No point in calling the delegate if it is a perfectly even partition size boundary
+                if (finalPartSize > 0) {
+                    loadByteRange(buffer, finalPartStart, finalPartSize);
+                    FilePart lastPart = new FilePart(srcFile, buffer, numParts, finalPartSize);
+                    delegateFilePartOperation(numParts, lastPart);
+                }
             }
         } catch (FilePartException fpe) {
             throw fpe;
