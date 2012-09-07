@@ -48,10 +48,6 @@ public class FileOperationSplitter {
         return jobId;
     }
 
-    public void setJobId(String jobId) {
-        this.jobId = jobId;
-    }
-
     /**
      * Start splitting the srcFile into chunks based on partitionSize and delegate to implementations of FilePartOperator.
      *
