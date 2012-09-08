@@ -15,11 +15,6 @@ public class Main {
 
     public static void main(String[] args) throws IOException, FilePartException {
 
-        Properties awsProps = new Properties();
-        awsProps.load(FileUtils.openInputStream(new File(System.getenv("HOME") + "/.aws/aws.properties")));
-
-        UploadFileCommand cmd = new UploadFileCommand(awsProps);
-        cmd.setFilePath("/home/saptarshi.roy/Downloads/ubuntu-10.04.4-server-amd64.iso");
-        cmd.execute();
+        System.out.println("Hello world");
     }
 }

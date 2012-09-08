@@ -2,6 +2,7 @@ package com.codechronicle.aws.glacier;
 
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.services.glacier.AmazonGlacier;
 import com.amazonaws.services.glacier.AmazonGlacierClient;
 
 import java.util.Properties;
@@ -16,10 +17,12 @@ import java.util.Properties;
 public abstract class GlacierCommand {
 
     private Properties awsProperties;
+    private AmazonGlacier client;
     private AWSCredentials credentials;
 
-    protected GlacierCommand(Properties awsProperties) {
+    protected GlacierCommand(Properties awsProperties, AmazonGlacier client) {
         this.awsProperties = awsProperties;
+        this.client = client;
         credentials = new BasicAWSCredentials(awsProperties.getProperty("accessKey"), awsProperties.getProperty("secretKey"));
     }
 
@@ -27,9 +30,11 @@ public abstract class GlacierCommand {
         return credentials;
     }
 
-    protected AmazonGlacierClient getClient() {
+    protected AmazonGlacier getClient() {
+        /*
         AmazonGlacierClient client = new AmazonGlacierClient(getCredentials());
         client.setEndpoint(awsProperties.getProperty("endPoint"));
+        */
         return client;
     }
 
