@@ -30,32 +30,12 @@ public class FileOperationSplitterTest {
             inputFileWithPrecisePartitionSizeMultiple = File.createTempFile("precisePartitionMultiple", ".dat");
             inputSmallerThanPartSizeFile = File.createTempFile("smallerThanPartSize", ".dat");
 
-            writeFileOfSize(inputFileWithRemainder, (int)(PART_SIZE * 10.5));
-            writeFileOfSize(inputFileWithPrecisePartitionSizeMultiple, PART_SIZE * 10);
-            writeFileOfSize(inputSmallerThanPartSizeFile, (int)(PART_SIZE / 2));
+            TestFileGenerator.writeFileOfSize(inputFileWithRemainder, (int)(PART_SIZE * 10.5));
+            TestFileGenerator.writeFileOfSize(inputFileWithPrecisePartitionSizeMultiple, PART_SIZE * 10);
+            TestFileGenerator.writeFileOfSize(inputSmallerThanPartSizeFile, (int)(PART_SIZE / 2));
 
         } catch (IOException e) {
             e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-        }
-    }
-
-    private void writeFileOfSize(File outputFile, int numBytes) throws IOException {
-        BufferedOutputStream bos = null;
-
-        try {
-            bos = new BufferedOutputStream(FileUtils.openOutputStream(outputFile));
-
-            byte b = (byte)(255 * Math.random());
-            for (int i=0; i<numBytes; i++) {
-                bos.write(b);
-            }
-
-        } catch (IOException ie) {
-            throw ie;
-        } finally {
-            if (bos != null) {
-                IOUtils.closeQuietly(bos);
-            }
         }
     }
 

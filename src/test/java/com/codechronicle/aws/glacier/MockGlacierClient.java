@@ -5,7 +5,12 @@ import com.amazonaws.AmazonServiceException;
 import com.amazonaws.AmazonWebServiceRequest;
 import com.amazonaws.ResponseMetadata;
 import com.amazonaws.services.glacier.AmazonGlacier;
+import com.amazonaws.services.glacier.TreeHashGenerator;
 import com.amazonaws.services.glacier.model.*;
+import org.apache.commons.io.IOUtils;
+
+import java.io.ByteArrayInputStream;
+import java.io.File;
 
 /**
  * Created with IntelliJ IDEA.
@@ -15,6 +20,18 @@ import com.amazonaws.services.glacier.model.*;
  * To change this template use File | Settings | File Templates.
  */
 public class MockGlacierClient implements AmazonGlacier {
+
+    public static final String UPLOAD_ID = "testJobId";
+    private String filePath;
+    private int numPartInvocations = 0;
+    private int numFullFileInvocations = 0;
+    private int numCompleteInvocations = 0;
+
+
+    public MockGlacierClient(String filePath) {
+        this.filePath = filePath;
+    }
+
     @Override
     public void setEndpoint(String endpoint) throws IllegalArgumentException {
         //To change body of implemented methods use File | Settings | File Templates.
@@ -53,9 +70,7 @@ public class MockGlacierClient implements AmazonGlacier {
     @Override
     public InitiateMultipartUploadResult initiateMultipartUpload(InitiateMultipartUploadRequest initiateMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
 
-        System.out.println("MOCK : " + initiateMultipartUploadRequest.getArchiveDescription());
-
-        InitiateMultipartUploadResult result = new InitiateMultipartUploadResult().withUploadId("testJobId");
+        InitiateMultipartUploadResult result = new InitiateMultipartUploadResult().withUploadId(UPLOAD_ID);
         return result;
     }
 
@@ -81,7 +96,25 @@ public class MockGlacierClient implements AmazonGlacier {
 
     @Override
     public UploadArchiveResult uploadArchive(UploadArchiveRequest uploadArchiveRequest) throws AmazonServiceException, AmazonClientException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        numFullFileInvocations++;
+
+        UploadArchiveResult result = new UploadArchiveResult();
+
+        File srcFile = new File(filePath);
+        long archiveSize = srcFile.length();
+        String fullFileChecksum = TreeHashGenerator.calculateTreeHash(srcFile);
+
+        if (!(fullFileChecksum.equals(uploadArchiveRequest.getChecksum()))) {
+            throw new AmazonClientException("Mismatched checksums, passed in : " + uploadArchiveRequest.getChecksum());
+        }
+
+        if (uploadArchiveRequest.getContentLength() != srcFile.length()) {
+            throw new AmazonClientException("Mismatched content length : " + uploadArchiveRequest.getContentLength());
+        }
+        result.setArchiveId("mockAWSGlacierArchiveId");
+        result.setChecksum(fullFileChecksum);
+
+        return result;  //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
@@ -91,12 +124,45 @@ public class MockGlacierClient implements AmazonGlacier {
 
     @Override
     public CompleteMultipartUploadResult completeMultipartUpload(CompleteMultipartUploadRequest completeMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+
+        numCompleteInvocations++;
+
+        File srcFile = new File(filePath);
+        long archiveSize = srcFile.length();
+        String fullFileChecksum = TreeHashGenerator.calculateTreeHash(srcFile);
+
+        if (!(fullFileChecksum.equals(completeMultipartUploadRequest.getChecksum()))) {
+            throw new AmazonClientException("Mismatched checksums, passed in : " + completeMultipartUploadRequest.getChecksum());
+        }
+
+        if (!completeMultipartUploadRequest.getArchiveSize().equals(""+srcFile.length())) {
+            throw new AmazonClientException("Mismatched total archive size : " + completeMultipartUploadRequest.getArchiveSize());
+        }
+
+        CompleteMultipartUploadResult result = new CompleteMultipartUploadResult();
+        result.setChecksum(fullFileChecksum);
+        result.setArchiveId("mockAWSGlacierArchiveId");
+
+        return result;
     }
 
     @Override
     public UploadMultipartPartResult uploadMultipartPart(UploadMultipartPartRequest uploadMultipartPartRequest) throws AmazonServiceException, AmazonClientException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+
+        numPartInvocations++;
+
+        String checksum = TreeHashGenerator.calculateTreeHash(uploadMultipartPartRequest.getBody());
+
+        if (!checksum.equals(uploadMultipartPartRequest.getChecksum())) {
+            throw new AmazonServiceException("Checksums do not match");
+        }
+
+        if (!UPLOAD_ID.equals(uploadMultipartPartRequest.getUploadId())) {
+            throw new AmazonServiceException("Unrecognized upload id = " + uploadMultipartPartRequest.getUploadId());
+        }
+
+        UploadMultipartPartResult result = new UploadMultipartPartResult().withChecksum(checksum);
+        return result;
     }
 
     @Override
@@ -127,5 +193,17 @@ public class MockGlacierClient implements AmazonGlacier {
     @Override
     public ResponseMetadata getCachedResponseMetadata(AmazonWebServiceRequest request) {
         return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    public int getNumPartInvocations() {
+        return numPartInvocations;
+    }
+
+    public int getNumFullFileInvocations() {
+        return numFullFileInvocations;
+    }
+
+    public int getNumCompleteInvocations() {
+        return numCompleteInvocations;
     }
 }
