@@ -23,6 +23,9 @@ public class UploadFileCommandTest {
     private File largeFile;
     private File smallFile;
 
+    //TODO: Test all kinds of invalid inputs
+
+
     @BeforeSuite
     public void generateTestFiles() throws IOException {
 

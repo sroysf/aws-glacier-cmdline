@@ -23,7 +23,6 @@ public abstract class GlacierCommand {
     protected GlacierCommand(Properties awsProperties, AmazonGlacier client) {
         this.awsProperties = awsProperties;
         this.client = client;
-        credentials = new BasicAWSCredentials(awsProperties.getProperty("accessKey"), awsProperties.getProperty("secretKey"));
     }
 
     protected AWSCredentials getCredentials() {

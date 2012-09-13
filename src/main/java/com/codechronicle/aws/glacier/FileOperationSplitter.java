@@ -91,6 +91,9 @@ public class FileOperationSplitter {
                     FilePart lastPart = new FilePart(srcFile, buffer, numParts, finalPartSize);
                     delegateFilePartOperation(numParts, lastPart);
                 }
+
+                // Finally, report completion of file processing
+                fpOperator.fileOperationsComplete();
             }
         } catch (FilePartException fpe) {
             throw fpe;

@@ -60,6 +60,12 @@ public class FileCopyOperator implements FilePartOperator {
         IOUtils.closeQuietly(fos);
     }
 
+    @Override
+    public void fileOperationsComplete() {
+        //TODO: Add this call to test validation
+        System.out.println("File operations complete called");
+    }
+
     public int getNumInvocationsFilePartOperation() {
         return numInvocationsFilePartOperation;
     }

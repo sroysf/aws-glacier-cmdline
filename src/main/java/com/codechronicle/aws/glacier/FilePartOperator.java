@@ -13,5 +13,7 @@ public interface FilePartOperator {
 
     void executeFullFileOperation(FilePart filePart);
 
+    void fileOperationsComplete();
+
     void close();
 }

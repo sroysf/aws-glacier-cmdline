@@ -8,6 +8,8 @@ import com.amazonaws.services.glacier.TreeHashGenerator;
 import com.amazonaws.services.glacier.model.*;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.entity.FileEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.List;
@@ -21,6 +23,8 @@ import java.util.Properties;
  * To change this template use File | Settings | File Templates.
  */
 public class UploadFileCommand extends GlacierCommand implements FilePartOperator {
+
+    private static Logger log = LoggerFactory.getLogger(UploadFileCommand.class);
 
     private static final int ONE_MEGABYTE = 1024*1024;
     public static final int PART_SIZE = ONE_MEGABYTE * 16;
@@ -46,22 +50,27 @@ public class UploadFileCommand extends GlacierCommand implements FilePartOperato
             instream.reset();
 
             long startByte = filePart.getPartNum() * PART_SIZE;
-            long endByte= startByte + filePart.getNumBytes();
+            long endByte= startByte + filePart.getNumBytes() - 1;
 
             UploadMultipartPartRequest partRequest = new UploadMultipartPartRequest()
                     .withAccountId(getAccountId())
                     .withBody(instream)
                     .withChecksum(treeHash)
-                    .withRange("Content-Range:bytes " + startByte + "-" + endByte + "/*")
+                    //.withRange("Content-Range:bytes " + startByte + "-" + endByte + "/*")
+                    //.withRange(startByte + "-" + endByte)
+                    //.withRange(startByte + "-" + endByte + "/*")
+                    .withRange("bytes " + startByte + "-" + endByte + "/*")
                     .withUploadId(uploadId)
                     .withVaultName(vaultName);
 
-            System.out.println("Uploading part number : " + filePart.getPartNum() + " --> " + partRequest.getRange());
+            log.info("Uploading part number : " + filePart.getPartNum() + " --> " + partRequest.getRange());
             UploadMultipartPartResult result = getClient().uploadMultipartPart(partRequest);
 
             if (!result.getChecksum().equals(treeHash)) {
                 throw new FilePartException("Checksum mismatch. Client calculated : " + treeHash + " but AWS computed : " + result.getChecksum(), filePart);
             }
+        } catch (Exception ex) {
+            throw new FilePartException("Unexpected Amazon error", filePart, ex);
         } finally {
             IOUtils.closeQuietly(instream);
         }
@@ -96,7 +105,7 @@ public class UploadFileCommand extends GlacierCommand implements FilePartOperato
     }
 
     @Override
-    public void close() {
+    public void fileOperationsComplete() {
 
         File srcFile = new File(filePath);
 
@@ -117,6 +126,7 @@ public class UploadFileCommand extends GlacierCommand implements FilePartOperato
         completeRequest.setUploadId(uploadId);
         completeRequest.setRequestCredentials(getCredentials());
 
+        log.info("Completing file upload for upload id = " + uploadId);
         CompleteMultipartUploadResult result = getClient().completeMultipartUpload(completeRequest);
         String awsChecksum = result.getChecksum();
         if (!fullFileChecksum.equals(awsChecksum)) {
@@ -124,6 +134,11 @@ public class UploadFileCommand extends GlacierCommand implements FilePartOperato
         }
 
         this.archiveId = result.getArchiveId();
+    }
+
+    @Override
+    public void close() {
+        // No-op in this case.
     }
 
     public void setFilePath(String filePath) {
@@ -151,6 +166,7 @@ public class UploadFileCommand extends GlacierCommand implements FilePartOperato
         fos.setFpOperator(this);
 
         try {
+            log.info("Initiating upload of " + filePath + " with upload id = " + uploadId);
             fos.start();
         } catch (Exception e) {
             e.printStackTrace();
