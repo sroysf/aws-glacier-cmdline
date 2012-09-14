@@ -14,6 +14,7 @@ import java.io.*;
  */
 public class FileOperationSplitter {
 
+    public static final String TRACKER_EXTENSION = ".ptracker";
     private File srcFile;
     private long srcFileLength;
     private RandomAccessFile raf;
@@ -148,7 +149,7 @@ public class FileOperationSplitter {
     private void initFiles() throws IOException {
         raf = new RandomAccessFile(srcFile, "r");
 
-        partTrackerFile = new File(srcFile.getAbsolutePath() + "." + jobId + ".ptracker");
+        partTrackerFile = new File(srcFile.getAbsolutePath() + TRACKER_EXTENSION + "." + jobId);
         if (partTrackerFile.exists()) {
             if (!partTrackerFile.canRead()) {
                 throw new IOException(partTrackerFile.getAbsolutePath() + " : cannot read");
@@ -186,5 +187,38 @@ public class FileOperationSplitter {
      */
     public void reset() {
         //TODO: Delete the status srcFile for this job.
+    }
+
+    public static String getExistingInProgressJobId(final File targetFile) {
+        File[] files = getMatchingTrackerFiles(targetFile);
+
+        if (files.length > 0) {
+            String trackerFileName = files[0].getName();
+            String jobId = trackerFileName.substring(trackerFileName.lastIndexOf(TRACKER_EXTENSION) + TRACKER_EXTENSION.length()+1);
+            return jobId;
+        } else {
+            return null;
+        }
+    }
+
+    public static void deleteMatchingTrackerFiles(final File targetFile) {
+        File[] files = getMatchingTrackerFiles(targetFile);
+
+        for (File file : files) {
+            file.delete();
+        }
+    }
+
+    private static File[] getMatchingTrackerFiles(final File targetFile) {
+        File directory = targetFile.getParentFile();
+        return directory.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String fname) {
+                boolean acceptValue = fname.startsWith(targetFile.getName()) &&
+                        fname.contains(TRACKER_EXTENSION);
+
+                return acceptValue;
+            }
+        });
     }
 }

@@ -158,9 +158,14 @@ public class UploadFileCommand extends GlacierCommand implements FilePartOperato
 
         AmazonGlacier client = getClient();
 
-        InitiateMultipartUploadRequest uploadJobRequest = new InitiateMultipartUploadRequest(vaultName, description, ""+PART_SIZE);
-        InitiateMultipartUploadResult result = client.initiateMultipartUpload(uploadJobRequest);
-        this.uploadId = result.getUploadId();
+        String existingUploadId = FileOperationSplitter.getExistingInProgressJobId(new File(filePath));
+        if (existingUploadId == null) {
+            InitiateMultipartUploadRequest uploadJobRequest = new InitiateMultipartUploadRequest(vaultName, description, ""+PART_SIZE);
+            InitiateMultipartUploadResult result = client.initiateMultipartUpload(uploadJobRequest);
+            this.uploadId = result.getUploadId();
+        } else {
+            this.uploadId = existingUploadId;
+        }
 
         FileOperationSplitter fos = new FileOperationSplitter(this.uploadId, new File(filePath), PART_SIZE);
         fos.setFpOperator(this);

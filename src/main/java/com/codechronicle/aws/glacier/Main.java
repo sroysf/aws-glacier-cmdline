@@ -23,7 +23,8 @@ public class Main {
         AmazonGlacier client = AmazonGlacierClientFactory.getClient(awsProps);
 
         UploadFileCommand cmd = new UploadFileCommand(awsProps, client);
-        cmd.setFilePath("/home/saptarshi.roy/Downloads/blackduck-bdspest-linux.bin");
+        //cmd.setFilePath("/home/saptarshi.roy/Downloads/blackduck-bdspest-linux.bin");
+        cmd.setFilePath("/Users/saptarshi.roy/Downloads/ubuntu-12.04.1-desktop-amd64.iso");
         cmd.setDescription("blackduck-bdspest-linux.bin");
         cmd.setVaultName("PersonalMedia");
 

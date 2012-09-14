@@ -18,6 +18,7 @@ public class FileOperationSplitterTest {
     private File inputFileWithRemainder;
     private File inputSmallerThanPartSizeFile;
     private File inputFileWithPrecisePartitionSizeMultiple;
+    private File coldStartResumeTestFile;
 
     //TODO: Confirm proper calling of EventListeners
     //TODO: Confirm invalid parameter exceptions
@@ -29,10 +30,12 @@ public class FileOperationSplitterTest {
             inputFileWithRemainder = File.createTempFile("withRemainder", ".dat");
             inputFileWithPrecisePartitionSizeMultiple = File.createTempFile("precisePartitionMultiple", ".dat");
             inputSmallerThanPartSizeFile = File.createTempFile("smallerThanPartSize", ".dat");
+            coldStartResumeTestFile = File.createTempFile("coldStartResumeFile",".dat");
 
             TestFileGenerator.writeFileOfSize(inputFileWithRemainder, (int)(PART_SIZE * 10.5));
             TestFileGenerator.writeFileOfSize(inputFileWithPrecisePartitionSizeMultiple, PART_SIZE * 10);
             TestFileGenerator.writeFileOfSize(inputSmallerThanPartSizeFile, (int)(PART_SIZE / 2));
+            TestFileGenerator.writeFileOfSize(coldStartResumeTestFile, (int)(PART_SIZE * 5.5));
 
         } catch (IOException e) {
             e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
@@ -139,6 +142,7 @@ public class FileOperationSplitterTest {
         deleteFile(inputSmallerThanPartSizeFile);
         deleteFile(inputFileWithRemainder);
         deleteFile(inputFileWithPrecisePartitionSizeMultiple);
+        deleteFile(coldStartResumeTestFile);
     }
 
     @Test
@@ -184,6 +188,54 @@ public class FileOperationSplitterTest {
                 outFile.delete();
             }
         }
+    }
+
+    @Test
+    public void testColdStartResume() {
+        final String jobId = "TEST_JOB_ABCD_1234";
+
+        FileOperationSplitter fos = new FileOperationSplitter(jobId, coldStartResumeTestFile, PART_SIZE);
+        fos.setFpOperator(new FilePartOperator() {
+
+            int count = 0;
+
+            @Override
+            public void executeFilePartOperation(FilePart filePart) throws FilePartException {
+                count++;
+                if (count == 3) {
+                    throw new FilePartException("Intentionally throwing exception on 3rd invocation", filePart);
+                }
+            }
+
+            @Override
+            public void executeFullFileOperation(FilePart filePart) {
+                //To change body of implemented methods use File | Settings | File Templates.
+            }
+
+            @Override
+            public void fileOperationsComplete() {
+                //To change body of implemented methods use File | Settings | File Templates.
+            }
+
+            @Override
+            public void close() {
+                //To change body of implemented methods use File | Settings | File Templates.
+            }
+        });
+
+        try {
+            fos.start();
+        } catch (IOException e) {
+            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+        } catch (FilePartException e) {
+            System.out.println("Caught expected exception");
+        }
+
+        String existingJobId = FileOperationSplitter.getExistingInProgressJobId(coldStartResumeTestFile);
+        Assert.assertEquals(existingJobId, jobId);
+
+        // Cleanup
+        FileOperationSplitter.deleteMatchingTrackerFiles(coldStartResumeTestFile);
     }
 
     private void deleteFile(File file) {
