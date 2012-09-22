@@ -1,6 +1,5 @@
-package com.codechronicle.aws.glacier;
+package com.codechronicle.aws.glacier.fileutil;
 
-import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,14 +13,12 @@ import java.io.*;
  */
 public class FileOperationSplitter {
 
-    public static final String TRACKER_EXTENSION = ".ptracker";
     private File srcFile;
     private long srcFileLength;
     private RandomAccessFile raf;
-    private File partTrackerFile;
     private int partitionSize;
     private FilePartOperator fpOperator;
-    private FilePartEventListener eventListener;
+    private int startPartNum = 1;
 
     private static Logger log = LoggerFactory.getLogger(FileOperationSplitter.class);
 
@@ -41,12 +38,12 @@ public class FileOperationSplitter {
         this.fpOperator = fpOperator;
     }
 
-    public void setEventListener(FilePartEventListener eventListener) {
-        this.eventListener = eventListener;
-    }
-
     public String getJobId() {
         return jobId;
+    }
+
+    public void setStartPartNum(int startPartNum) {
+        this.startPartNum = startPartNum;
     }
 
     /**
@@ -72,10 +69,9 @@ public class FileOperationSplitter {
 
             } else {
 
-                int startPartNum = determineStartingPartNumber();
                 int numParts = (int)(srcFileLength / partitionSize);
 
-                for (int i=(startPartNum+1); i < numParts; i++) {
+                for (int i=(startPartNum-1); i < numParts; i++) {
                     loadByteRange(buffer, (i * partitionSize), partitionSize);
 
                     FilePart filePart = new FilePart(srcFile, buffer, i, partitionSize);
@@ -103,9 +99,6 @@ public class FileOperationSplitter {
                 fpOperator.close();
             }
         }
-
-        // Everything was successful, clean up
-        cleanup();
     }
 
     private void delegateFilePartOperation(int i, FilePart filePart) throws FilePartException, IOException {
@@ -114,30 +107,6 @@ public class FileOperationSplitter {
         }
 
         fpOperator.executeFilePartOperation(filePart);
-
-        // It succeeded, so let's record that fact.
-        markSuccessfulPartOperation(i);
-        if (eventListener != null) {
-            eventListener.onSuccess(filePart);
-        }
-    }
-
-    private void cleanup() {
-        partTrackerFile.delete();
-    }
-
-    private void markSuccessfulPartOperation(int i) throws IOException {
-        FileUtils.writeStringToFile(partTrackerFile, ""+i);
-
-    }
-
-    private int determineStartingPartNumber() throws IOException {
-        String fileContents = FileUtils.readFileToString(partTrackerFile);
-        if (fileContents.length() == 0) {
-            return -1;
-        } else {
-            return Integer.parseInt(fileContents.trim());
-        }
     }
 
     private byte[] loadByteRange(byte[] buffer, long offset, int numBytes) throws IOException {
@@ -148,18 +117,6 @@ public class FileOperationSplitter {
 
     private void initFiles() throws IOException {
         raf = new RandomAccessFile(srcFile, "r");
-
-        partTrackerFile = new File(srcFile.getAbsolutePath() + TRACKER_EXTENSION + "." + jobId);
-        if (partTrackerFile.exists()) {
-            if (!partTrackerFile.canRead()) {
-                throw new IOException(partTrackerFile.getAbsolutePath() + " : cannot read");
-            }
-        } else {
-            partTrackerFile.createNewFile();
-        }
-
-        log.info("Part Tracker file = " + partTrackerFile.getAbsolutePath());
-
         this.srcFileLength = srcFile.length();
     }
 
@@ -179,46 +136,5 @@ public class FileOperationSplitter {
         if (partitionSize <= 0) {
             throw new IllegalArgumentException("Partition size must be a positive number");
         }
-    }
-
-    /**
-     * Erase partial run states and force this class to start from the beginning, regardless of previous
-     * successful returns from FilePartOperator implementation.
-     */
-    public void reset() {
-        //TODO: Delete the status srcFile for this job.
-    }
-
-    public static String getExistingInProgressJobId(final File targetFile) {
-        File[] files = getMatchingTrackerFiles(targetFile);
-
-        if (files.length > 0) {
-            String trackerFileName = files[0].getName();
-            String jobId = trackerFileName.substring(trackerFileName.lastIndexOf(TRACKER_EXTENSION) + TRACKER_EXTENSION.length()+1);
-            return jobId;
-        } else {
-            return null;
-        }
-    }
-
-    public static void deleteMatchingTrackerFiles(final File targetFile) {
-        File[] files = getMatchingTrackerFiles(targetFile);
-
-        for (File file : files) {
-            file.delete();
-        }
-    }
-
-    private static File[] getMatchingTrackerFiles(final File targetFile) {
-        File directory = targetFile.getParentFile();
-        return directory.listFiles(new FilenameFilter() {
-            @Override
-            public boolean accept(File dir, String fname) {
-                boolean acceptValue = fname.startsWith(targetFile.getName()) &&
-                        fname.contains(TRACKER_EXTENSION);
-
-                return acceptValue;
-            }
-        });
     }
 }

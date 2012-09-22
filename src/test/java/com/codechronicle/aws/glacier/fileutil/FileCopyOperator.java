@@ -1,5 +1,8 @@
-package com.codechronicle.aws.glacier;
+package com.codechronicle.aws.glacier.fileutil;
 
+import com.codechronicle.aws.glacier.fileutil.FilePart;
+import com.codechronicle.aws.glacier.fileutil.FilePartException;
+import com.codechronicle.aws.glacier.fileutil.FilePartOperator;
 import org.apache.commons.io.IOUtils;
 
 import java.io.*;

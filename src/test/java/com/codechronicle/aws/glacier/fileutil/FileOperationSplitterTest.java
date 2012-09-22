@@ -1,13 +1,12 @@
-package com.codechronicle.aws.glacier;
+package com.codechronicle.aws.glacier.fileutil;
 
+import com.codechronicle.aws.glacier.TestFileGenerator;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 
@@ -32,7 +31,7 @@ public class FileOperationSplitterTest {
             inputSmallerThanPartSizeFile = File.createTempFile("smallerThanPartSize", ".dat");
             coldStartResumeTestFile = File.createTempFile("coldStartResumeFile",".dat");
 
-            TestFileGenerator.writeFileOfSize(inputFileWithRemainder, (int)(PART_SIZE * 10.5));
+            TestFileGenerator.writeFileOfSize(inputFileWithRemainder, (int) (PART_SIZE * 10.5));
             TestFileGenerator.writeFileOfSize(inputFileWithPrecisePartitionSizeMultiple, PART_SIZE * 10);
             TestFileGenerator.writeFileOfSize(inputSmallerThanPartSizeFile, (int)(PART_SIZE / 2));
             TestFileGenerator.writeFileOfSize(coldStartResumeTestFile, (int)(PART_SIZE * 5.5));
@@ -42,8 +41,9 @@ public class FileOperationSplitterTest {
         }
     }
 
-    public FileCopyOperator testCopyFile(String jobId, File srcFile, FileCopyOperator copyOperator) throws IOException, FilePartException {
+    public FileCopyOperator testCopyFile(String jobId, File srcFile, FileCopyOperator copyOperator, int startPartNum) throws IOException, FilePartException {
         FileOperationSplitter fos = new FileOperationSplitter(jobId, srcFile, PART_SIZE);
+        fos.setStartPartNum(startPartNum);
 
         fos.setFpOperator(copyOperator);
         fos.start();
@@ -78,7 +78,7 @@ public class FileOperationSplitterTest {
             outFile = File.createTempFile(jobId, ".out");
 
             FileCopyOperator fco = new FileCopyOperator(outFile);
-            testCopyFile(jobId, srcFile, fco);
+            testCopyFile(jobId, srcFile, fco, 1);
 
             int expectedInvocations = (int)(srcFile.length() / PART_SIZE) + 1;
             Assert.assertEquals(fco.getNumInvocationsFilePartOperation(), expectedInvocations);
@@ -101,7 +101,7 @@ public class FileOperationSplitterTest {
             outFile = File.createTempFile(jobId, ".out");
 
             FileCopyOperator fco = new FileCopyOperator(outFile);
-            testCopyFile(jobId, srcFile, fco);
+            testCopyFile(jobId, srcFile, fco, 1);
 
             int expectedInvocations = (int)(srcFile.length() / PART_SIZE);
             Assert.assertEquals(fco.getNumInvocationsFilePartOperation(), expectedInvocations);
@@ -125,7 +125,7 @@ public class FileOperationSplitterTest {
             outFile = File.createTempFile(jobId, ".out");
 
             FileCopyOperator fco = new FileCopyOperator(outFile);
-            testCopyFile(jobId, srcFile, fco);
+            testCopyFile(jobId, srcFile, fco, 1);
 
             int expectedInvocations = (int)(srcFile.length() / PART_SIZE);
             Assert.assertEquals(fco.getNumInvocationsFilePartOperation(), 0);
@@ -157,17 +157,18 @@ public class FileOperationSplitterTest {
             int expectedInvocations = (int)(srcFile.length() / PART_SIZE);
 
             FileCopyOperator fco = new FileCopyOperator(outFile);
-            fco.setAbortOnInvocationNumber((int)(expectedInvocations / 2));
+            int abortOnIteration = (int)(expectedInvocations / 2);
+            fco.setAbortOnInvocationNumber(abortOnIteration);
             try {
-                testCopyFile(jobId, srcFile, fco);
+                testCopyFile(jobId, srcFile, fco, 1);
             } catch (RuntimeException rte) {
                 // Make sure we actually aborted after 5 tries, with the right message
-                Assert.assertEquals(fco.getNumInvocationsFilePartOperation(),(int)(expectedInvocations / 2));
+                Assert.assertEquals(fco.getNumInvocationsFilePartOperation(),abortOnIteration);
                 Assert.assertTrue(rte.getMessage().startsWith("Intentionally throwing exception"));
 
                 // Now retry again
                 fco = new FileCopyOperator(outFile); // Reopens the file stream.
-                testCopyFile(jobId, srcFile, fco);
+                testCopyFile(jobId, srcFile, fco, abortOnIteration);
 
                 // The second set of invocations should 1 more than half, since it includes the retry.
                 Assert.assertEquals(fco.getNumInvocationsFilePartOperation(), ((int)(expectedInvocations / 2)+1));
@@ -188,54 +189,6 @@ public class FileOperationSplitterTest {
                 outFile.delete();
             }
         }
-    }
-
-    @Test
-    public void testColdStartResume() {
-        final String jobId = "TEST_JOB_ABCD_1234";
-
-        FileOperationSplitter fos = new FileOperationSplitter(jobId, coldStartResumeTestFile, PART_SIZE);
-        fos.setFpOperator(new FilePartOperator() {
-
-            int count = 0;
-
-            @Override
-            public void executeFilePartOperation(FilePart filePart) throws FilePartException {
-                count++;
-                if (count == 3) {
-                    throw new FilePartException("Intentionally throwing exception on 3rd invocation", filePart);
-                }
-            }
-
-            @Override
-            public void executeFullFileOperation(FilePart filePart) {
-                //To change body of implemented methods use File | Settings | File Templates.
-            }
-
-            @Override
-            public void fileOperationsComplete() {
-                //To change body of implemented methods use File | Settings | File Templates.
-            }
-
-            @Override
-            public void close() {
-                //To change body of implemented methods use File | Settings | File Templates.
-            }
-        });
-
-        try {
-            fos.start();
-        } catch (IOException e) {
-            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-        } catch (FilePartException e) {
-            System.out.println("Caught expected exception");
-        }
-
-        String existingJobId = FileOperationSplitter.getExistingInProgressJobId(coldStartResumeTestFile);
-        Assert.assertEquals(existingJobId, jobId);
-
-        // Cleanup
-        FileOperationSplitter.deleteMatchingTrackerFiles(coldStartResumeTestFile);
     }
 
     private void deleteFile(File file) {

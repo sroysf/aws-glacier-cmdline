@@ -1,4 +1,4 @@
-package com.codechronicle.aws.glacier;
+package com.codechronicle.aws.glacier.command;
 
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;

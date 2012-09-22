@@ -1,18 +1,18 @@
-package com.codechronicle.aws.glacier;
+package com.codechronicle.aws.glacier.command;
 
 import com.amazonaws.AmazonServiceException;
-import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.services.glacier.AmazonGlacier;
-import com.amazonaws.services.glacier.AmazonGlacierClient;
 import com.amazonaws.services.glacier.TreeHashGenerator;
 import com.amazonaws.services.glacier.model.*;
+import com.codechronicle.aws.glacier.fileutil.FileOperationSplitter;
+import com.codechronicle.aws.glacier.fileutil.FilePart;
+import com.codechronicle.aws.glacier.fileutil.FilePartException;
+import com.codechronicle.aws.glacier.fileutil.FilePartOperator;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.entity.FileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.List;
 import java.util.Properties;
 
 /**
@@ -158,7 +158,7 @@ public class UploadFileCommand extends GlacierCommand implements FilePartOperato
 
         AmazonGlacier client = getClient();
 
-        String existingUploadId = FileOperationSplitter.getExistingInProgressJobId(new File(filePath));
+        String existingUploadId = getExistingInProgressJobId(new File(filePath));
         if (existingUploadId == null) {
             InitiateMultipartUploadRequest uploadJobRequest = new InitiateMultipartUploadRequest(vaultName, description, ""+PART_SIZE);
             InitiateMultipartUploadResult result = client.initiateMultipartUpload(uploadJobRequest);
@@ -176,5 +176,10 @@ public class UploadFileCommand extends GlacierCommand implements FilePartOperato
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private String getExistingInProgressJobId(File file) {
+        //TODO: Implement this method to detect a previously aborted job
+        return null;  //To change body of created methods use File | Settings | File Templates.
     }
 }

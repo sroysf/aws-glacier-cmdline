@@ -1,7 +1,8 @@
 package com.codechronicle.aws.glacier;
 
 import com.amazonaws.services.glacier.AmazonGlacier;
-import com.amazonaws.services.glacier.AmazonGlacierClient;
+import com.codechronicle.aws.glacier.command.UploadFileCommand;
+import com.codechronicle.aws.glacier.fileutil.FilePartException;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,4 +1,4 @@
-package com.codechronicle.aws.glacier;
+package com.codechronicle.aws.glacier.fileutil;
 
 import java.io.File;
 

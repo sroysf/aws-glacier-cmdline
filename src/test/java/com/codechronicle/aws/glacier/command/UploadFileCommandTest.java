@@ -1,6 +1,8 @@
-package com.codechronicle.aws.glacier;
+package com.codechronicle.aws.glacier.command;
 
-import com.amazonaws.services.glacier.AmazonGlacier;
+import com.codechronicle.aws.glacier.MockGlacierClient;
+import com.codechronicle.aws.glacier.TestFileGenerator;
+import com.codechronicle.aws.glacier.command.UploadFileCommand;
 import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterSuite;
@@ -32,7 +34,7 @@ public class UploadFileCommandTest {
         largeFile = File.createTempFile("UploadFileCommandTest.largeInputFile", ".dat");
         smallFile = File.createTempFile("UploadFileCommandTest.smallInputFile", ".dat");
 
-        TestFileGenerator.writeFileOfSize(largeFile, (int)(UploadFileCommand.PART_SIZE * 2.5));
+        TestFileGenerator.writeFileOfSize(largeFile, (int) (UploadFileCommand.PART_SIZE * 2.5));
         TestFileGenerator.writeFileOfSize(smallFile, (int)(UploadFileCommand.PART_SIZE * 0.7));
     }
 
