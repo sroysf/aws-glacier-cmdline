@@ -43,6 +43,8 @@ public class Main {
 
             System.out.println("Result = " + cmd.getResult().getResultCode() + " [" + cmd.getResult().getMessage() + "]");
 
+            Thread.sleep(10000);
+
         } catch (Exception ex) {
             log.error("Unexpected exception", ex);
         } finally {

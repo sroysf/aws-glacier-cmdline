@@ -2,6 +2,8 @@ package com.codechronicle.aws.glacier.model;
 
 import com.codechronicle.aws.glacier.command.CommandResultCode;
 
+import java.sql.Timestamp;
+
 /**
  * Created with IntelliJ IDEA.
  * User: sroy
@@ -17,6 +19,8 @@ public class FileUploadRecord {
     private String vault;
     private String json;
     private FileUploadStatus status;
+    private Timestamp creationDate;
+    private Timestamp completionDate;
 
     public int getId() {
         return id;
@@ -72,5 +76,21 @@ public class FileUploadRecord {
 
     public void setStatus(FileUploadStatus status) {
         this.status = status;
+    }
+
+    public Timestamp getCreationDate() {
+        return creationDate;
+    }
+
+    public void setCreationDate(Timestamp creationDate) {
+        this.creationDate = creationDate;
+    }
+
+    public Timestamp getCompletionDate() {
+        return completionDate;
+    }
+
+    public void setCompletionDate(Timestamp completionDate) {
+        this.completionDate = completionDate;
     }
 }

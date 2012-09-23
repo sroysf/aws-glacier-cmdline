@@ -12,13 +12,14 @@ import javax.sql.DataSource;
  * To change this template use File | Settings | File Templates.
  */
 public class BaseDAO {
-    private QueryRunner queryRunner;
+
+    private DataSource dataSource;
 
     public BaseDAO(DataSource dataSource) {
-        this.queryRunner = new QueryRunner(dataSource);
+        this.dataSource = dataSource;
     }
 
     protected QueryRunner getQueryRunner() {
-        return queryRunner;
+        return new QueryRunner(dataSource);
     }
 }

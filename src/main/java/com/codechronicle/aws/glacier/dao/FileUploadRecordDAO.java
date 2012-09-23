@@ -7,6 +7,10 @@ import org.apache.commons.dbutils.ResultSetHandler;
 import javax.sql.DataSource;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.GregorianCalendar;
+import java.util.List;
 
 /**
  * Created with IntelliJ IDEA.
@@ -37,6 +41,23 @@ public class FileUploadRecordDAO extends BaseDAO {
         return record;
     }
 
+    public List<FileUploadRecord> findByStatus(FileUploadStatus status) throws SQLException {
+        List<FileUploadRecord> records = null;
+
+        records = getQueryRunner().query("SELECT * FROM UPLOAD WHERE status=? ORDER BY id ASC", new ResultSetHandler<List<FileUploadRecord>>() {
+            @Override
+            public List<FileUploadRecord> handle(ResultSet rs) throws SQLException {
+                List<FileUploadRecord> results = new ArrayList<FileUploadRecord>();
+                while (rs.next()) {
+                    results.add(mapFileRecord(rs));
+                }
+                return results;
+            }
+        }, status.toString());
+
+        return records;
+    }
+
     private FileUploadRecord mapFileRecord(ResultSet rs) throws SQLException {
         FileUploadRecord record = new FileUploadRecord();
 
@@ -47,17 +68,32 @@ public class FileUploadRecordDAO extends BaseDAO {
         record.setJson(rs.getString("json"));
         record.setStatus(FileUploadStatus.valueOf(rs.getString("status")));
         record.setVault(rs.getString("vault"));
+        record.setCreationDate(rs.getTimestamp("creationDate"));
+        record.setCompletionDate(rs.getTimestamp("completionDate"));
 
         return record;
     }
 
-    public void save(FileUploadRecord fileUploadRecord) throws SQLException {
-        getQueryRunner().update("INSERT INTO UPLOAD (awsUploadId, fileHash, fileName, vault, json, status) VALUES (?,?,?,?,?,?)",
+    public void create(FileUploadRecord fileUploadRecord) throws SQLException {
+        getQueryRunner().update("INSERT INTO UPLOAD (awsUploadId, fileHash, fileName, vault, json, status, creationDate) VALUES (?,?,?,?,?,?,?)",
                 fileUploadRecord.getAwsUploadId(),
                 fileUploadRecord.getFileHash(),
                 fileUploadRecord.getFileName(),
                 fileUploadRecord.getVault(),
                 fileUploadRecord.getJson(),
-                fileUploadRecord.getStatus().toString());
+                fileUploadRecord.getStatus().toString(),
+                new GregorianCalendar().getTime());
+    }
+
+    public void update(FileUploadRecord fileUploadRecord) throws SQLException {
+        getQueryRunner().update("UPDATE UPLOAD u SET awsUploadId=?, fileHash=?, fileName=?, vault=?, json=?, status=?, completionDate=? WHERE u.id=?",
+                fileUploadRecord.getAwsUploadId(),
+                fileUploadRecord.getFileHash(),
+                fileUploadRecord.getFileName(),
+                fileUploadRecord.getVault(),
+                fileUploadRecord.getJson(),
+                fileUploadRecord.getStatus().toString(),
+                fileUploadRecord.getCompletionDate(),
+                fileUploadRecord.getId());
     }
 }

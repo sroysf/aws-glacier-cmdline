@@ -5,7 +5,9 @@ CREATE TABLE PUBLIC.UPLOAD (
     fileHash            VARCHAR(100),
     vault               VARCHAR(50),
     json                VARCHAR(500),
-    status              VARCHAR(15)
+    status              VARCHAR(15),
+    creationDate        DATETIME,
+    completionDate      DATETIME
 );
 
 CREATE TABLE PUBLIC.UPLOAD_PART (
