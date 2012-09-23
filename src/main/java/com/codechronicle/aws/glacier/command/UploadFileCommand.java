@@ -36,7 +36,7 @@ public class UploadFileCommand extends GlacierCommand implements FilePartOperato
     private String archiveId;
 
     public UploadFileCommand(Properties awsProperties, AmazonGlacier client) {
-        super(awsProperties,client);
+        super(awsProperties,client, null);
     }
 
     @Override
