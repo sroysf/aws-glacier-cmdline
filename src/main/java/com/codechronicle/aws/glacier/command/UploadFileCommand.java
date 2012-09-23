@@ -154,7 +154,7 @@ public class UploadFileCommand extends GlacierCommand implements FilePartOperato
     }
 
     @Override
-    public void execute() {
+    public void executeCustomLogic() {
 
         AmazonGlacier client = getClient();
 

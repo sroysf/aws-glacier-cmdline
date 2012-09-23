@@ -5,7 +5,11 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.glacier.AmazonGlacier;
 import com.amazonaws.services.glacier.AmazonGlacierClient;
 import com.mchange.v2.c3p0.PooledDataSource;
+import org.apache.commons.dbutils.QueryRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
@@ -22,11 +26,15 @@ public abstract class GlacierCommand {
     private Properties awsProperties;
     private AmazonGlacier client;
     private AWSCredentials credentials;
-    private PooledDataSource dataSource;
+    private CommandResult result;
+    private DataSource dataSource;
 
-    protected GlacierCommand(Properties awsProperties, AmazonGlacier client, PooledDataSource dataSource) {
+    private static Logger log = LoggerFactory.getLogger(GlacierCommand.class);
+
+    protected GlacierCommand(Properties awsProperties, AmazonGlacier client, DataSource dataSource) {
         this.awsProperties = awsProperties;
         this.client = client;
+        this.result = new CommandResult();
         this.dataSource = dataSource;
     }
 
@@ -42,9 +50,23 @@ public abstract class GlacierCommand {
         return awsProperties.getProperty("accountId");
     }
 
-    protected Connection getConnection() throws SQLException {
-        return dataSource.getConnection();
+    public CommandResult getResult() {
+        return result;
     }
 
-    public abstract void execute();
+    protected DataSource getDataSource() {
+        return dataSource;
+    }
+
+    public void execute() {
+        try {
+            executeCustomLogic();
+        } catch (Exception ex) {
+            this.result.setMessage("Unexpected Error");
+            this.result.setResultCode(CommandResultCode.UNEXPECTED_ERROR);
+            log.error("Unexpected error", ex);
+        }
+    }
+
+    protected abstract void executeCustomLogic() throws Exception;
 }

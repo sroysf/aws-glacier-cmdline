@@ -35,20 +35,13 @@ public class Main {
         ComboPooledDataSource dataSource = HSQLDBUtil.initializeDatabase(null);
 
         try {
-            QueryRunner insertQR = new QueryRunner(dataSource);
-            insertQR.update("INSERT INTO PUBLIC.COMMAND (action,params) VALUES (?,?)",
-                    "Upload", "{json -" + new java.util.Date().toString() + "}");
 
-            QueryRunner qr = new QueryRunner(dataSource);
-            qr.query("SELECT * FROM PUBLIC.COMMAND", new ResultSetHandler<Object>() {
-                @Override
-                public Object handle(ResultSet rs) throws SQLException {
-                    while (rs.next()) {
-                        System.out.println(rs.getString("action") + " ==> " + rs.getString("params"));
-                    }
-                    return null;
-                }
-            });
+            PersistentUploadFileCommand cmd = new PersistentUploadFileCommand(awsProps, client, dataSource);
+            cmd.setFilePath("/home/sroy/Downloads/google-chrome-stable_current_amd64.deb");
+            cmd.setVault("PersonalMedia");
+            cmd.execute();
+
+            System.out.println("Result = " + cmd.getResult().getResultCode() + " [" + cmd.getResult().getMessage() + "]");
 
         } catch (Exception ex) {
             log.error("Unexpected exception", ex);
@@ -56,21 +49,5 @@ public class Main {
             HSQLDBUtil.shutdownDatabase(dataSource);
             dataSource.close();
         }
-    }
-
-    public static void mainX(String[] args) throws IOException, FilePartException {
-
-        Properties awsProps = new Properties();
-        awsProps.load(FileUtils.openInputStream(new File(System.getenv("HOME") + "/.aws/aws.properties")));
-
-        AmazonGlacier client = AmazonGlacierClientFactory.getClient(awsProps);
-
-        UploadFileCommand cmd = new UploadFileCommand(awsProps, client);
-        //cmd.setFilePath("/home/saptarshi.roy/Downloads/blackduck-bdspest-linux.bin");
-        cmd.setFilePath("/Users/saptarshi.roy/Downloads/ubuntu-12.04.1-desktop-amd64.iso");
-        cmd.setDescription("blackduck-bdspest-linux.bin");
-        cmd.setVaultName("PersonalMedia");
-
-        cmd.execute();
     }
 }

@@ -35,7 +35,7 @@ public class HSQLDBUtil {
         }
 
         File dbFile = new File(workingDirectory, "glacierdb");
-        File dbPropsFile = new File(dbFile.getAbsolutePath() + ".properties");
+        File dbPropsFile = new File(dbFile.getAbsolutePath() + ".script");
         boolean isFreshDB = !dbPropsFile.exists();
 
         ComboPooledDataSource dataSource = new ComboPooledDataSource();
