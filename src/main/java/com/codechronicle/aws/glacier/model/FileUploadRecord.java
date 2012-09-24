@@ -1,7 +1,5 @@
 package com.codechronicle.aws.glacier.model;
 
-import com.codechronicle.aws.glacier.command.CommandResultCode;
-
 import java.sql.Timestamp;
 
 /**
@@ -14,10 +12,11 @@ import java.sql.Timestamp;
 public class FileUploadRecord {
     private int id;
     private String awsUploadId;
-    private String fileName;
+    private String filePath;
     private String fileHash;
     private String vault;
     private String json;
+    private long length;
     private FileUploadStatus status;
     private Timestamp creationDate;
     private Timestamp completionDate;
@@ -38,12 +37,12 @@ public class FileUploadRecord {
         this.awsUploadId = awsUploadId;
     }
 
-    public String getFileName() {
-        return fileName;
+    public String getFilePath() {
+        return filePath;
     }
 
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
+    public void setFilePath(String filePath) {
+        this.filePath = filePath;
     }
 
     public String getFileHash() {
@@ -76,6 +75,14 @@ public class FileUploadRecord {
 
     public void setStatus(FileUploadStatus status) {
         this.status = status;
+    }
+
+    public long getLength() {
+        return length;
+    }
+
+    public void setLength(long length) {
+        this.length = length;
     }
 
     public Timestamp getCreationDate() {

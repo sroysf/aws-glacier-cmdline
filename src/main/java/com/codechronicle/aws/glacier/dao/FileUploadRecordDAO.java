@@ -7,7 +7,6 @@ import org.apache.commons.dbutils.ResultSetHandler;
 import javax.sql.DataSource;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.List;
@@ -64,24 +63,26 @@ public class FileUploadRecordDAO extends BaseDAO {
         record.setId(rs.getInt("id"));
         record.setAwsUploadId(rs.getString("awsUploadId"));
         record.setFileHash(rs.getString("fileHash"));
-        record.setFileName(rs.getString("fileName"));
+        record.setFilePath(rs.getString("fileName"));
         record.setJson(rs.getString("json"));
         record.setStatus(FileUploadStatus.valueOf(rs.getString("status")));
         record.setVault(rs.getString("vault"));
         record.setCreationDate(rs.getTimestamp("creationDate"));
+        record.setLength(rs.getLong("length"));
         record.setCompletionDate(rs.getTimestamp("completionDate"));
 
         return record;
     }
 
     public void create(FileUploadRecord fileUploadRecord) throws SQLException {
-        getQueryRunner().update("INSERT INTO UPLOAD (awsUploadId, fileHash, fileName, vault, json, status, creationDate) VALUES (?,?,?,?,?,?,?)",
+        getQueryRunner().update("INSERT INTO UPLOAD (awsUploadId, fileHash, fileName, vault, json, status, length, creationDate) VALUES (?,?,?,?,?,?,?,?)",
                 fileUploadRecord.getAwsUploadId(),
                 fileUploadRecord.getFileHash(),
-                fileUploadRecord.getFileName(),
+                fileUploadRecord.getFilePath(),
                 fileUploadRecord.getVault(),
                 fileUploadRecord.getJson(),
                 fileUploadRecord.getStatus().toString(),
+                fileUploadRecord.getLength(),
                 new GregorianCalendar().getTime());
     }
 
@@ -89,7 +90,7 @@ public class FileUploadRecordDAO extends BaseDAO {
         getQueryRunner().update("UPDATE UPLOAD u SET awsUploadId=?, fileHash=?, fileName=?, vault=?, json=?, status=?, completionDate=? WHERE u.id=?",
                 fileUploadRecord.getAwsUploadId(),
                 fileUploadRecord.getFileHash(),
-                fileUploadRecord.getFileName(),
+                fileUploadRecord.getFilePath(),
                 fileUploadRecord.getVault(),
                 fileUploadRecord.getJson(),
                 fileUploadRecord.getStatus().toString(),

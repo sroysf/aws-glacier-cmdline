@@ -3,6 +3,7 @@ package com.codechronicle.aws.glacier;
 import com.amazonaws.services.glacier.AmazonGlacier;
 import com.codechronicle.aws.glacier.command.PersistentUploadFileCommand;
 import com.codechronicle.aws.glacier.command.UploadFileCommand;
+import com.codechronicle.aws.glacier.dao.FileUploadPartDAO;
 import com.codechronicle.aws.glacier.dbutil.HSQLDBUtil;
 import com.codechronicle.aws.glacier.fileutil.FilePartException;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
@@ -36,12 +37,11 @@ public class Main {
 
         try {
 
-            PersistentUploadFileCommand cmd = new PersistentUploadFileCommand(awsProps, client, dataSource);
-            cmd.setFilePath("/home/sroy/Downloads/google-chrome-stable_current_amd64.deb");
-            cmd.setVault("PersonalMedia");
-            cmd.execute();
+            testFileUpload(awsProps, client, dataSource);
 
-            System.out.println("Result = " + cmd.getResult().getResultCode() + " [" + cmd.getResult().getMessage() + "]");
+            /*FileUploadPartDAO fupDAO = new FileUploadPartDAO(dataSource);
+            int max = fupDAO.findMaxSuccessfulPartNumber(0);
+            System.out.println("Max = " + max);*/
 
             Thread.sleep(10000);
 
@@ -51,5 +51,14 @@ public class Main {
             HSQLDBUtil.shutdownDatabase(dataSource);
             dataSource.close();
         }
+    }
+
+    private static void testFileUpload(Properties awsProps, AmazonGlacier client, ComboPooledDataSource dataSource) {
+        PersistentUploadFileCommand cmd = new PersistentUploadFileCommand(awsProps, client, dataSource);
+        cmd.setFilePath("/home/sroy/Downloads/google-chrome-stable_current_amd64.deb");
+        cmd.setVault("PersonalMedia");
+        cmd.execute();
+
+        System.out.println("Result = " + cmd.getResult().getResultCode() + " [" + cmd.getResult().getMessage() + "]");
     }
 }

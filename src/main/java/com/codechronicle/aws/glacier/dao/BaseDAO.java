@@ -13,13 +13,13 @@ import javax.sql.DataSource;
  */
 public class BaseDAO {
 
-    private DataSource dataSource;
+    private QueryRunner queryRunner;
 
     public BaseDAO(DataSource dataSource) {
-        this.dataSource = dataSource;
+        this.queryRunner = new QueryRunner(dataSource);
     }
 
     protected QueryRunner getQueryRunner() {
-        return new QueryRunner(dataSource);
+        return queryRunner;
     }
 }

@@ -2,14 +2,20 @@ package com.codechronicle.aws.glacier.command;
 
 import com.amazonaws.services.glacier.AmazonGlacier;
 import com.amazonaws.services.glacier.TreeHashGenerator;
+import com.codechronicle.aws.glacier.AppConstants;
+import com.codechronicle.aws.glacier.dao.FileUploadPartDAO;
 import com.codechronicle.aws.glacier.dao.FileUploadRecordDAO;
+import com.codechronicle.aws.glacier.fileutil.FilePart;
+import com.codechronicle.aws.glacier.model.FileUploadPart;
 import com.codechronicle.aws.glacier.model.FileUploadRecord;
 import com.codechronicle.aws.glacier.model.FileUploadStatus;
 import com.mchange.v2.c3p0.PooledDataSource;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
+import java.io.*;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Properties;
@@ -73,10 +79,12 @@ public class PersistentUploadFileCommand extends GlacierCommand implements Runna
         // Wake up file upload worker thread as needed
 
         fileUploadRecord = new FileUploadRecord();
-        fileUploadRecord.setFileName(file.getName());
+        fileUploadRecord.setFilePath(file.getAbsolutePath());
         fileUploadRecord.setVault(vault);
         fileUploadRecord.setFileHash(fileHash);
+        fileUploadRecord.setLength(file.length());
         fileUploadRecord.setStatus(FileUploadStatus.PENDING);
+
 
         log.info("Saving new file upload entry for " + file.getAbsolutePath());
         fuDAO.create(fileUploadRecord);
@@ -146,9 +154,9 @@ public class PersistentUploadFileCommand extends GlacierCommand implements Runna
         }
     }
 
-    private void serviceUploads(List<FileUploadRecord> uploadFiles) throws SQLException {
+    private void serviceUploads(List<FileUploadRecord> uploadFiles) throws SQLException, IOException {
         for (FileUploadRecord uploadFile : uploadFiles) {
-            log.info("Processing file : " + uploadFile.getFileName());
+            log.info("Processing file : " + uploadFile.getFilePath());
 
             if (uploadFile.getStatus() == FileUploadStatus.PENDING) {
                 processPendingUpload(uploadFile);
@@ -158,11 +166,11 @@ public class PersistentUploadFileCommand extends GlacierCommand implements Runna
         }
     }
 
-    private void processInProgressUpload(FileUploadRecord uploadFile) {
+    private void processInProgressUpload(FileUploadRecord uploadFile) throws SQLException, IOException {
         processMultiPartUpload(uploadFile);
     }
 
-    private void processPendingUpload(FileUploadRecord uploadFile) throws SQLException {
+    private void processPendingUpload(FileUploadRecord uploadFile) throws SQLException, IOException {
 
         //TODO: Do a direct upload if the size is smaller than the partition size
         String awsUploadId = initiateUpload(uploadFile);
@@ -174,13 +182,83 @@ public class PersistentUploadFileCommand extends GlacierCommand implements Runna
         processMultiPartUpload(uploadFile);
     }
 
-    private void processMultiPartUpload(FileUploadRecord uploadFile) {
-        log.info("Continuing multi-part upload of file : " + uploadFile.getFileName());
+    private void processMultiPartUpload(FileUploadRecord uploadFile) throws SQLException, IOException {
+        log.info("Continuing multi-part upload of file : " + uploadFile.getFilePath());
+
+        // Look in parts table to determine the next part to upload
+        FileUploadPartDAO fupDAO = new FileUploadPartDAO(getDataSource());
+        int maxPartUploaded = fupDAO.findMaxSuccessfulPartNumber(uploadFile.getId());
+
+        // Calculate number of parts that should be in the file
+        int numTotalParts = calculateTotalParts(uploadFile);
+
+        while (maxPartUploaded < numTotalParts) {
+            uploadPart(uploadFile, ++maxPartUploaded);
+        }
+
+        // If done, then finish it out with the upload complete AWS API call.
+    }
+
+    private void uploadPart(FileUploadRecord uploadFile, int partNum) throws SQLException, IOException {
+        FileUploadPart part = new FileUploadPart();
+        part.setUploadId(uploadFile.getId());
+
+        long startByte = (partNum-1) * AppConstants.NETWORK_PARTITION_SIZE;
+        long endByte = startByte + AppConstants.NETWORK_PARTITION_SIZE - 1;
+
+        if (endByte > uploadFile.getLength()) {
+            endByte = uploadFile.getLength()- 1;
+        }
+
+        part.setStartByte(startByte);
+        part.setEndByte(endByte);
+        part.setPartNum(partNum);
+
+        // Load the exact bytes that we need
+        InputStream byteStream = null;
+
+        try {
+            byteStream = loadBytes(uploadFile.getFilePath(), startByte, endByte);
+            part.setPartHash(TreeHashGenerator.calculateTreeHash(byteStream));
+            byteStream.reset();
+        } finally {
+            IOUtils.closeQuietly(byteStream);
+        }
+
+        System.out.println("Part #" + partNum + " ==> Uploading bytes " + startByte + " to " + endByte);
+
+        FileUploadPartDAO fupDao = new FileUploadPartDAO(getDataSource());
+        fupDao.create(part);
+    }
+
+    private InputStream loadBytes(String filePath, long startByte, long endByte) throws IOException {
+        int numBytes = (int)((endByte-startByte)+1);
+        byte[] buffer = new byte[numBytes];
+
+        RandomAccessFile raf = new RandomAccessFile(new File(filePath), "r");
+        raf.seek(startByte);
+        raf.read(buffer, 0, numBytes);
+
+        System.out.println("Loading number of bytes = " + numBytes);
+        System.out.println("Partition size = " + AppConstants.NETWORK_PARTITION_SIZE);
+
+        ByteArrayInputStream is = new ByteArrayInputStream(buffer);
+        return is;
+    }
+
+    private int calculateTotalParts(FileUploadRecord uploadFile) {
+
+        int parts = (int)(uploadFile.getLength() / AppConstants.NETWORK_PARTITION_SIZE);
+        int remainder = (int)(uploadFile.getLength() % AppConstants.NETWORK_PARTITION_SIZE);
+
+        parts += (remainder > 0) ? 1 : 0;
+
+        return parts;
     }
 
     private String initiateUpload(FileUploadRecord uploadFile) {
         String awsUploadId = "AWS-2343242";
-        log.info("Initiating upload of file : " + uploadFile.getFileName() + " with AWS upload id=" + awsUploadId);
+        log.info("Initiating upload of file : " + uploadFile.getFilePath() + " with AWS upload id=" + awsUploadId);
 
         return awsUploadId;
     }
