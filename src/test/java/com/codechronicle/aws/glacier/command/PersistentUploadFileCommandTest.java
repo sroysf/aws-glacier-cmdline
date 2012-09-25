@@ -108,10 +108,10 @@ public class PersistentUploadFileCommandTest {
         });
 
         uploadFile(smallFile);
-        //uploadFile(exactFile);
-        //uploadFile(largeFile);
+        uploadFile(exactFile);
+        uploadFile(largeFile);
 
-        while (events.size() < 1) {
+        while (events.size() < 3) {
             synchronized (client) {
                 client.wait();
                 System.out.println("Received " + events.size() + " completion events");
@@ -130,6 +130,8 @@ public class PersistentUploadFileCommandTest {
         }
 
         assertTrue(findMatchingHash(smallFile, hashes), "Unable to find small file in expected vault dir = " + vaultDir.getAbsolutePath());
+        assertTrue(findMatchingHash(largeFile, hashes), "Unable to find large file in expected vault dir = " + vaultDir.getAbsolutePath());
+        assertTrue(findMatchingHash(exactFile, hashes), "Unable to find exact file in expected vault dir = " + vaultDir.getAbsolutePath());
     }
 
     private boolean findMatchingHash(File file, List<String> hashes) {

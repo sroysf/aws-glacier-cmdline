@@ -8,10 +8,10 @@ import com.amazonaws.services.glacier.AmazonGlacier;
 import com.amazonaws.services.glacier.TreeHashGenerator;
 import com.amazonaws.services.glacier.model.*;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.UUID;
+import java.io.*;
+import java.util.*;
 
 /**
  * Created with IntelliJ IDEA.
@@ -25,6 +25,9 @@ public class MockGlacierClient implements AmazonGlacier {
     public static final String UPLOAD_ID = "testJobId";
     private File tempUploadDirectory;
 
+    private Map<String,InitiateMultipartUploadRequest> multiPartMap = new HashMap<String, InitiateMultipartUploadRequest>();
+    private Map<String,List<UploadMultipartPartRequest>> inProgressPartsMap = new HashMap<String, List<UploadMultipartPartRequest>>();
+
     public MockGlacierClient() {
         tempUploadDirectory = new File(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
         tempUploadDirectory.mkdirs();
@@ -34,14 +37,6 @@ public class MockGlacierClient implements AmazonGlacier {
     public void cleanup() throws IOException {
         FileUtils.deleteDirectory(tempUploadDirectory);
     }
-
-    @Override
-    public InitiateMultipartUploadResult initiateMultipartUpload(InitiateMultipartUploadRequest initiateMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
-
-        InitiateMultipartUploadResult result = new InitiateMultipartUploadResult().withUploadId(UPLOAD_ID);
-        return result;
-    }
-
 
 
     @Override
@@ -89,18 +84,144 @@ public class MockGlacierClient implements AmazonGlacier {
         return vaultDir;
     }
 
-
     @Override
-    public CompleteMultipartUploadResult completeMultipartUpload(CompleteMultipartUploadRequest completeMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
+    public InitiateMultipartUploadResult initiateMultipartUpload(InitiateMultipartUploadRequest initiateMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
+        String uploadId = "AWS-ID-" + UUID.randomUUID().toString();
 
-        CompleteMultipartUploadResult result = new CompleteMultipartUploadResult();
+        //TODO: Add validation of partition size
+
+        multiPartMap.put(uploadId, initiateMultipartUploadRequest);
+        InitiateMultipartUploadResult result = new InitiateMultipartUploadResult().withUploadId(uploadId);
         return result;
     }
 
     @Override
-    public UploadMultipartPartResult uploadMultipartPart(UploadMultipartPartRequest uploadMultipartPartRequest) throws AmazonServiceException, AmazonClientException {
-        UploadMultipartPartResult result = new UploadMultipartPartResult();
+    public CompleteMultipartUploadResult completeMultipartUpload(CompleteMultipartUploadRequest completeMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
+
+        final String uploadId = completeMultipartUploadRequest.getUploadId();
+        InitiateMultipartUploadRequest request = multiPartMap.get(uploadId);
+
+        if (request == null) {
+            throw new AmazonClientException("Invalid upload id = " + uploadId);
+        }
+
+        File vaultDir = createVaultDirectory(request.getVaultName());
+        File[] parts = vaultDir.listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+                return pathname.getName().startsWith(uploadId);  //To change body of implemented methods use File | Settings | File Templates.
+            }
+        });
+
+        List<File> partsList = new ArrayList<File>();
+        for (File part : parts) {
+            partsList.add(part);
+        }
+        Collections.sort(partsList);
+
+        // Stitch all the parts together
+        System.out.println("Stitching part files together...");
+        String archiveId = generateArchiveId();
+        File combinedFile = null;
+
+        try {
+            combinedFile = stitchParts(vaultDir, archiveId, partsList);
+        } catch (IOException e) {
+            throw new AmazonServiceException("Unable to stitch files together : " + vaultDir.getAbsolutePath() + "/" + archiveId);
+        }
+
+        // Calculate and compare hash
+        String fullHash = TreeHashGenerator.calculateTreeHash(combinedFile);
+        if (!completeMultipartUploadRequest.getChecksum().equals(fullHash)) {
+            throw new AmazonClientException("Hashes for full file did not match : " + completeMultipartUploadRequest.getChecksum() + "==" + fullHash);
+        }
+
+        CompleteMultipartUploadResult result = new CompleteMultipartUploadResult();
+        result.setChecksum(fullHash);
+        result.setArchiveId(archiveId);
+
         return result;
+    }
+
+    private File stitchParts(File vaultDir, String archiveId, List<File> partsList) throws IOException {
+
+        File outfile = new File(vaultDir, archiveId);
+        BufferedOutputStream outputStream = null;
+
+        try {
+            outputStream = new BufferedOutputStream(new FileOutputStream(outfile, true));
+            for (File partFile : partsList) {
+                InputStream instream = null;
+
+                try {
+                    instream = FileUtils.openInputStream(partFile);
+                    IOUtils.copy(instream, outputStream);
+                } finally {
+                    IOUtils.closeQuietly(instream);
+                }
+            }
+        } finally {
+            if (outputStream != null) {
+                IOUtils.closeQuietly(outputStream);
+            }
+        }
+        return outfile;
+    }
+
+
+    @Override
+    public UploadMultipartPartResult uploadMultipartPart(UploadMultipartPartRequest uploadMultipartPartRequest) throws AmazonServiceException, AmazonClientException {
+
+        InitiateMultipartUploadRequest request = multiPartMap.get(uploadMultipartPartRequest.getUploadId());
+        if (request == null) {
+            throw new AmazonClientException("No matching pending multipart request found for upload id = " + uploadMultipartPartRequest.getUploadId());
+        }
+
+        File vaultDir = createVaultDirectory(request.getVaultName());
+        int numParts = addPartTracker(uploadMultipartPartRequest.getUploadId(), uploadMultipartPartRequest);
+
+        File partFile = new File(vaultDir, uploadMultipartPartRequest.getUploadId() + ".part." + numParts);
+        try {
+            FileUtils.copyInputStreamToFile(uploadMultipartPartRequest.getBody(), partFile);
+        } catch (IOException e) {
+            throw new AmazonServiceException("While writing file", e);
+        }
+
+        UploadMultipartPartResult result = new UploadMultipartPartResult();
+
+        String checksum = TreeHashGenerator.calculateTreeHash(partFile);
+
+        if (!checksum.equals(uploadMultipartPartRequest.getChecksum())) {
+            throw new AmazonClientException("Hashes did not match for uploaded part : " +  uploadMultipartPartRequest.getUploadId() + ":" + uploadMultipartPartRequest.getRange());
+        }
+
+        result.setChecksum(checksum);
+
+        return result;
+    }
+
+    private int addPartTracker(String uploadId, UploadMultipartPartRequest uploadMultipartPartRequest) {
+        List<UploadMultipartPartRequest> parts = inProgressPartsMap.get(uploadId);
+        if (parts == null) {
+            parts = new ArrayList<UploadMultipartPartRequest>();
+            inProgressPartsMap.put(uploadId, parts);
+        }
+
+        if (findByRange(parts, uploadMultipartPartRequest) == null) {
+            parts.add(uploadMultipartPartRequest);
+        }
+
+        return parts.size();
+    }
+
+    private UploadMultipartPartRequest findByRange(List<UploadMultipartPartRequest> parts, UploadMultipartPartRequest uploadMultipartPartRequest) {
+        for (UploadMultipartPartRequest part : parts) {
+            if (part.getRange().equals(uploadMultipartPartRequest.getRange())) {
+                return part;
+            }
+        }
+
+        return null;
     }
 
     // =========================
