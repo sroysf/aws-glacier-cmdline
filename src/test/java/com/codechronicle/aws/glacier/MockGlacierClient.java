@@ -49,6 +49,16 @@ public class MockGlacierClient implements AmazonGlacier {
         String archiveId = generateArchiveId();
         File storedFile = new File(vaultDir, archiveId);
         try {
+            // Test streams, based on real-world experience with Amazon
+            InputStream instream = uploadArchiveRequest.getBody();
+            if (!instream.markSupported()) {
+                throw new AmazonClientException("Input stream must support mark and reset properly");
+            }
+            instream.mark(10);
+            instream.read();
+            instream.read();
+            instream.reset();
+
             FileUtils.copyInputStreamToFile(uploadArchiveRequest.getBody(), storedFile);
         } catch (IOException e) {
             throw new AmazonServiceException("Error while storing file", e);

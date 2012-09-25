@@ -13,6 +13,7 @@ import com.codechronicle.aws.glacier.event.EventType;
 import com.codechronicle.aws.glacier.model.FileUploadPart;
 import com.codechronicle.aws.glacier.model.FileUploadRecord;
 import com.codechronicle.aws.glacier.model.FileUploadStatus;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,7 +80,11 @@ public class UploadFileWorker implements Runnable {
     }
 
     private void processInProgressUpload(FileUploadRecord uploadFile) throws SQLException, IOException {
-        processMultiPartUpload(uploadFile);
+        if (uploadFile.getLength() < AppConstants.NETWORK_PARTITION_SIZE) {
+            processEntireFileUpload(uploadFile);
+        } else {
+            processMultiPartUpload(uploadFile);
+        }
     }
 
     private void processPendingUpload(FileUploadRecord uploadFile) throws SQLException, IOException {
@@ -98,27 +103,35 @@ public class UploadFileWorker implements Runnable {
         }
     }
 
-    private void processEntireFileUpload(FileUploadRecord uploadFile) throws FileNotFoundException, SQLException {
+    private void processEntireFileUpload(FileUploadRecord uploadFile) throws IOException, SQLException {
 
         File file = new File(uploadFile.getFilePath());
-        BufferedInputStream instream = new BufferedInputStream(new FileInputStream(file));
+        InputStream instream = null;
+
         String checksum = TreeHashGenerator.calculateTreeHash(file);
         long contentLength = uploadFile.getLength();
 
-        UploadArchiveRequest request = new UploadArchiveRequest()
-                .withAccountId(config.getAccountId())
-                .withArchiveDescription(file.getName())
-                .withBody(instream)
-                .withChecksum(checksum)
-                .withContentLength(contentLength)
-                .withVaultName(uploadFile.getVault());
+        try {
+            byte[] buffer = FileUtils.readFileToByteArray(file);
+            instream = new ByteArrayInputStream(buffer);
+            UploadArchiveRequest request = new UploadArchiveRequest()
+                    .withAccountId(config.getAccountId())
+                    .withArchiveDescription(file.getName())
+                    .withBody(instream)
+                    .withChecksum(checksum)
+                    .withContentLength(contentLength)
+                    .withVaultName(uploadFile.getVault());
 
-        UploadArchiveResult result = config.getClient().uploadArchive(request);
-        if (!result.getChecksum().equals(checksum)) {
-            throw new AmazonServiceException("Checksum mismatch. Client calculated : " + checksum + " but AWS computed : " + result.getChecksum());
+            UploadArchiveResult result = config.getClient().uploadArchive(request);
+            if (!result.getChecksum().equals(checksum)) {
+                throw new AmazonServiceException("Checksum mismatch. Client calculated : " + checksum + " but AWS computed : " + result.getChecksum());
+            }
+
+            uploadFile.setAwsArchiveId(result.getArchiveId());
+            markFileUploadComplete(uploadFile);
+        } finally {
+            IOUtils.closeQuietly(instream);
         }
-
-        markFileUploadComplete(uploadFile);
     }
 
     private void markFileUploadComplete(FileUploadRecord uploadFile) throws SQLException {
@@ -168,6 +181,7 @@ public class UploadFileWorker implements Runnable {
             throw new RuntimeException("AWS checksum for full file did not match calculated checksum. AWS=" + awsChecksum + " Calculated=" + uploadFile.getFileHash());
         }
 
+        uploadFile.setAwsArchiveId(result.getArchiveId());
         markFileUploadComplete(uploadFile);
         log.info("File upload complete : " + uploadFile.getFilePath());
     }

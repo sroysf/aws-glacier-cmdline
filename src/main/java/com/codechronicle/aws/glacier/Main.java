@@ -3,13 +3,20 @@ package com.codechronicle.aws.glacier;
 import com.amazonaws.services.glacier.AmazonGlacier;
 import com.codechronicle.aws.glacier.command.PersistentUploadFileCommand;
 import com.codechronicle.aws.glacier.dbutil.HSQLDBUtil;
+import com.codechronicle.aws.glacier.event.Event;
+import com.codechronicle.aws.glacier.event.EventListener;
+import com.codechronicle.aws.glacier.event.EventRegistry;
+import com.codechronicle.aws.glacier.event.EventType;
+import com.codechronicle.aws.glacier.model.FileUploadRecord;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Properties;
 
 
@@ -17,48 +24,37 @@ public class Main {
 
     private static Logger log = LoggerFactory.getLogger(Main.class);
 
+
     public static void main(String[] args) throws IOException {
-        String[] files = new String[] {"/tmp/fb901e8b-ffcf-4d13-b0c7-d56c8dbe3984/testVault/AWS-ID-b603ce56-a3d0-4299-b8e2-e045f3bae8e7.part.1",
-        "/tmp/fb901e8b-ffcf-4d13-b0c7-d56c8dbe3984/testVault/AWS-ID-b603ce56-a3d0-4299-b8e2-e045f3bae8e7.part.2",
-        "/tmp/fb901e8b-ffcf-4d13-b0c7-d56c8dbe3984/testVault/AWS-ID-b603ce56-a3d0-4299-b8e2-e045f3bae8e7.part.3"};
-
-        File outfile = new File("/tmp/fb901e8b-ffcf-4d13-b0c7-d56c8dbe3984/testVault/combined");
-        BufferedOutputStream outputStream = null;
-
-        try {
-            outputStream = new BufferedOutputStream(new FileOutputStream(outfile, true));
-            for (String file : files) {
-                File partFile = new File(file);
-                InputStream instream = null;
-
-                try {
-                    instream = FileUtils.openInputStream(partFile);
-                    IOUtils.copy(instream, outputStream);
-                } finally {
-                    IOUtils.closeQuietly(instream);
-                }
-            }
-        } finally {
-            if (outputStream != null) {
-                IOUtils.closeQuietly(outputStream);
-            }
-        }
-    }
-
-    public static void mainX(String[] args) throws IOException {
 
         Properties awsProps = new Properties();
         awsProps.load(FileUtils.openInputStream(new File(System.getenv("HOME") + "/.aws/aws.properties")));
 
-        AmazonGlacier client = AmazonGlacierClientFactory.getClient(awsProps);
+        final AmazonGlacier client = AmazonGlacierClientFactory.getClient(awsProps);
 
         ComboPooledDataSource dataSource = HSQLDBUtil.initializeDatabase(null);
 
         try {
 
-            testFileUpload(awsProps, client, dataSource);
+            EnvironmentConfiguration config = new EnvironmentConfiguration();
+            config.setAwsProperties(awsProps);
+            config.setClient(client);
+            config.setDataSource(dataSource);
 
-            Thread.sleep(10000);
+            EventRegistry.register(EventType.UPLOAD_COMPLETE, new EventListener() {
+                @Override
+                public void onEvent(Event event) {
+                    FileUploadRecord record = (FileUploadRecord)event.getMessagePayload();
+                    log.info("Completed upload of file : " + record.getFilePath());
+                }
+            });
+
+            PersistentUploadFileCommand cmd = new PersistentUploadFileCommand(config);
+            cmd.setVault("PersonalMedia");
+            cmd.setFilePath("/home/sroy/glacier/media-1997.tar.gpg");
+            cmd.execute();
+
+            doKeyBoardInputLoop();
 
         } catch (Exception ex) {
             log.error("Unexpected exception", ex);
@@ -68,12 +64,20 @@ public class Main {
         }
     }
 
-    private static void testFileUpload(Properties awsProps, AmazonGlacier client, ComboPooledDataSource dataSource) {
-        /*PersistentUploadFileCommand cmd = new PersistentUploadFileCommand(awsProps, client, dataSource);
-        cmd.setFilePath("/home/sroy/Downloads/google-chrome-stable_current_amd64.deb");
-        cmd.setVault("PersonalMedia");
-        cmd.execute();
+    public static void doKeyBoardInputLoop() throws IOException {
+        String curLine = ""; // Line read from standard in
 
-        System.out.println("Result = " + cmd.getResult().getResultCode() + " [" + cmd.getResult().getMessage() + "]");*/
+        System.out.println("Enter a line of text (type 'quit' to exit): ");
+        InputStreamReader converter = new InputStreamReader(System.in);
+        BufferedReader in = new BufferedReader(converter);
+
+        while (!(curLine.equals("quit"))){
+            curLine = in.readLine();
+
+            if (!(curLine.equals("quit"))){
+                System.out.println("You typed: " + curLine);
+            }
+        }
     }
+
 }

@@ -42,8 +42,8 @@ public class PersistentUploadFileCommandTest {
     private MockGlacierClient client = new MockGlacierClient();
 
     //TODO: Test all kinds of invalid inputs
-    //TODO: Upgrade MockGlacierClient to actually piece together files so it's an accurate representation of what goes
-    //      on within AWS
+    //TODO: Confirm database state after file uploads are complete
+    //TODO: Add test of interrupted or error scenario, graceful recovery
 
 
     @BeforeSuite
@@ -155,105 +155,4 @@ public class PersistentUploadFileCommandTest {
         CommandResult result = cmd.getResult();
         assertEquals(CommandResultCode.SUCCESS.ordinal(), result.getResultCode().ordinal());
     }
-
-    /*@Test
-    public void testUploadLargeFile () throws Exception{
-
-        Properties awsProps = getAwsProperties();
-
-        final MockGlacierClient client = new MockGlacierClient(largeFile.getAbsolutePath());
-        PersistentUploadFileCommand cmd = new PersistentUploadFileCommand(awsProps, client, datasource);
-        cmd.setFilePath(largeFile.getAbsolutePath());
-        cmd.setEventListener(new FileUploadEventListener() {
-            @Override
-            public void onUploadComplete(FileUploadRecord record) {
-                synchronized (client) {
-                    client.notify();
-                }
-            }
-        });
-
-        cmd.execute();
-        synchronized (client) {
-            System.out.println("Waiting for asynchronous command to complete...");
-            client.wait(10000);
-        }
-
-        try {
-            int expectedInvocations = (int)(largeFile.length() / AppConstants.NETWORK_PARTITION_SIZE) + 1;
-            Assert.assertEquals(1, client.getNumCompleteInvocations());
-            Assert.assertEquals(0, client.getNumFullFileInvocations());
-            Assert.assertEquals(expectedInvocations, client.getNumPartInvocations());
-        } finally {
-            client.cleanup();
-        }
-
-    }
-
-
-
-    @Test
-    public void testUploadExactFile () throws Exception{
-
-        Properties awsProps = getAwsProperties();
-
-        final MockGlacierClient client = new MockGlacierClient(exactFile.getAbsolutePath());
-        PersistentUploadFileCommand cmd = new PersistentUploadFileCommand(awsProps, client, datasource);
-        cmd.setFilePath(exactFile.getAbsolutePath());
-        cmd.setEventListener(new FileUploadEventListener() {
-            @Override
-            public void onUploadComplete(FileUploadRecord record) {
-                synchronized (client) {
-                    client.notify();
-                }
-            }
-        });
-
-        cmd.execute();
-        synchronized (client) {
-            System.out.println("Waiting for asynchronous command to complete...");
-            client.wait(10000);
-        }
-
-        try {
-            int expectedInvocations = 1;
-            Assert.assertEquals(1, client.getNumCompleteInvocations());
-            Assert.assertEquals(0, client.getNumFullFileInvocations());
-            Assert.assertEquals(expectedInvocations, client.getNumPartInvocations());
-        } finally {
-            client.cleanup();
-        }
-    }
-
-    @Test
-    public void testUploadSmallFile () throws Exception{
-
-        Properties awsProps = getAwsProperties();
-
-        final MockGlacierClient client = new MockGlacierClient(smallFile.getAbsolutePath());
-        PersistentUploadFileCommand cmd = new PersistentUploadFileCommand(awsProps, client, datasource);
-        cmd.setFilePath(smallFile.getAbsolutePath());
-        cmd.setEventListener(new FileUploadEventListener() {
-            @Override
-            public void onUploadComplete(FileUploadRecord record) {
-                synchronized (client) {
-                    client.notify();
-                }
-            }
-        });
-
-        cmd.execute();
-        synchronized (client) {
-            System.out.println("Waiting for asynchronous command to complete...");
-            client.wait(10000);
-        }
-
-        try {
-            Assert.assertEquals(0, client.getNumCompleteInvocations());
-            Assert.assertEquals(0, client.getNumPartInvocations());
-            Assert.assertEquals(1, client.getNumFullFileInvocations());
-        } finally {
-            client.cleanup();;
-        }
-    }*/
 }

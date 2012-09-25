@@ -64,6 +64,7 @@ public class FileUploadRecordDAO extends BaseDAO {
         record.setAwsUploadId(rs.getString("awsUploadId"));
         record.setFileHash(rs.getString("fileHash"));
         record.setFilePath(rs.getString("fileName"));
+        record.setAwsArchiveId(rs.getString("awsArchiveId"));
         record.setJson(rs.getString("json"));
         record.setStatus(FileUploadStatus.valueOf(rs.getString("status")));
         record.setVault(rs.getString("vault"));
@@ -87,8 +88,9 @@ public class FileUploadRecordDAO extends BaseDAO {
     }
 
     public void update(FileUploadRecord fileUploadRecord) throws SQLException {
-        getQueryRunner().update("UPDATE UPLOAD u SET awsUploadId=?, fileHash=?, fileName=?, vault=?, json=?, status=?, completionDate=? WHERE u.id=?",
+        getQueryRunner().update("UPDATE UPLOAD u SET awsUploadId=?, awsArchiveId=?, fileHash=?, fileName=?, vault=?, json=?, status=?, completionDate=? WHERE u.id=?",
                 fileUploadRecord.getAwsUploadId(),
+                fileUploadRecord.getAwsArchiveId(),
                 fileUploadRecord.getFileHash(),
                 fileUploadRecord.getFilePath(),
                 fileUploadRecord.getVault(),

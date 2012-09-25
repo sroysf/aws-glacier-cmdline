@@ -12,6 +12,7 @@ import java.sql.Timestamp;
 public class FileUploadRecord {
     private int id;
     private String awsUploadId;
+    private String awsArchiveId;
     private String filePath;
     private String fileHash;
     private String vault;
@@ -99,5 +100,13 @@ public class FileUploadRecord {
 
     public void setCompletionDate(Timestamp completionDate) {
         this.completionDate = completionDate;
+    }
+
+    public String getAwsArchiveId() {
+        return awsArchiveId;
+    }
+
+    public void setAwsArchiveId(String awsArchiveId) {
+        this.awsArchiveId = awsArchiveId;
     }
 }
