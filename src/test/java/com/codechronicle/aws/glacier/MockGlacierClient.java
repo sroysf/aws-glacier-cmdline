@@ -7,10 +7,11 @@ import com.amazonaws.ResponseMetadata;
 import com.amazonaws.services.glacier.AmazonGlacier;
 import com.amazonaws.services.glacier.TreeHashGenerator;
 import com.amazonaws.services.glacier.model.*;
-import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.FileUtils;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.IOException;
+import java.util.UUID;
 
 /**
  * Created with IntelliJ IDEA.
@@ -22,14 +23,122 @@ import java.io.File;
 public class MockGlacierClient implements AmazonGlacier {
 
     public static final String UPLOAD_ID = "testJobId";
-    private String filePath;
-    private int numPartInvocations = 0;
-    private int numFullFileInvocations = 0;
-    private int numCompleteInvocations = 0;
+    private File tempUploadDirectory;
+
+    public MockGlacierClient() {
+        tempUploadDirectory = new File(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
+        tempUploadDirectory.mkdirs();
+        System.out.println("MockGlacierClient using upload directory : " + tempUploadDirectory.getAbsolutePath());
+    }
+
+    public void cleanup() throws IOException {
+        FileUtils.deleteDirectory(tempUploadDirectory);
+    }
+
+    @Override
+    public InitiateMultipartUploadResult initiateMultipartUpload(InitiateMultipartUploadRequest initiateMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
+
+        InitiateMultipartUploadResult result = new InitiateMultipartUploadResult().withUploadId(UPLOAD_ID);
+        return result;
+    }
 
 
-    public MockGlacierClient(String filePath) {
-        this.filePath = filePath;
+
+    @Override
+    public UploadArchiveResult uploadArchive(UploadArchiveRequest uploadArchiveRequest) throws AmazonServiceException, AmazonClientException {
+        UploadArchiveResult result = new UploadArchiveResult();
+
+        String vault = uploadArchiveRequest.getVaultName();
+        File vaultDir = createVaultDirectory(vault);
+
+        String archiveId = generateArchiveId();
+        File storedFile = new File(vaultDir, archiveId);
+        try {
+            FileUtils.copyInputStreamToFile(uploadArchiveRequest.getBody(), storedFile);
+        } catch (IOException e) {
+            throw new AmazonServiceException("Error while storing file", e);
+        }
+
+        // Compare hashes
+        String computedHash = TreeHashGenerator.calculateTreeHash(storedFile);
+        if (!uploadArchiveRequest.getChecksum().equals(computedHash)) {
+            throw new AmazonServiceException("Hash codes did not match");
+        }
+
+        result.setArchiveId(archiveId);
+        result.setChecksum(computedHash);
+        result.setLocation("/aws/fake/url/" + archiveId);
+
+        return result;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    private String generateArchiveId() {
+        return UUID.randomUUID().toString();
+    }
+
+    public File getUploadDirectory() {
+        return tempUploadDirectory;
+    }
+
+    private File createVaultDirectory(String vault) {
+        File vaultDir = new File(tempUploadDirectory, vault);
+        if (!vaultDir.exists()) {
+            vaultDir.mkdirs();
+        }
+
+        return vaultDir;
+    }
+
+
+    @Override
+    public CompleteMultipartUploadResult completeMultipartUpload(CompleteMultipartUploadRequest completeMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
+
+        CompleteMultipartUploadResult result = new CompleteMultipartUploadResult();
+        return result;
+    }
+
+    @Override
+    public UploadMultipartPartResult uploadMultipartPart(UploadMultipartPartRequest uploadMultipartPartRequest) throws AmazonServiceException, AmazonClientException {
+        UploadMultipartPartResult result = new UploadMultipartPartResult();
+        return result;
+    }
+
+    // =========================
+    // Unimplemented Methods
+
+    @Override
+    public DescribeVaultResult describeVault(DescribeVaultRequest describeVaultRequest) throws AmazonServiceException, AmazonClientException {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public void deleteVaultNotifications(DeleteVaultNotificationsRequest deleteVaultNotificationsRequest) throws AmazonServiceException, AmazonClientException {
+        //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public ListMultipartUploadsResult listMultipartUploads(ListMultipartUploadsRequest listMultipartUploadsRequest) throws AmazonServiceException, AmazonClientException {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public void deleteVault(DeleteVaultRequest deleteVaultRequest) throws AmazonServiceException, AmazonClientException {
+        //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public void shutdown() {
+        //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public ResponseMetadata getCachedResponseMetadata(AmazonWebServiceRequest request) {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public void setVaultNotifications(SetVaultNotificationsRequest setVaultNotificationsRequest) throws AmazonServiceException, AmazonClientException {
+        //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
@@ -68,13 +177,6 @@ public class MockGlacierClient implements AmazonGlacier {
     }
 
     @Override
-    public InitiateMultipartUploadResult initiateMultipartUpload(InitiateMultipartUploadRequest initiateMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
-
-        InitiateMultipartUploadResult result = new InitiateMultipartUploadResult().withUploadId(UPLOAD_ID);
-        return result;
-    }
-
-    @Override
     public void abortMultipartUpload(AbortMultipartUploadRequest abortMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
         //To change body of implemented methods use File | Settings | File Templates.
     }
@@ -92,118 +194,5 @@ public class MockGlacierClient implements AmazonGlacier {
     @Override
     public InitiateJobResult initiateJob(InitiateJobRequest initiateJobRequest) throws AmazonServiceException, AmazonClientException {
         return null;  //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public UploadArchiveResult uploadArchive(UploadArchiveRequest uploadArchiveRequest) throws AmazonServiceException, AmazonClientException {
-        numFullFileInvocations++;
-
-        UploadArchiveResult result = new UploadArchiveResult();
-
-        File srcFile = new File(filePath);
-        long archiveSize = srcFile.length();
-        String fullFileChecksum = TreeHashGenerator.calculateTreeHash(srcFile);
-
-        if (!(fullFileChecksum.equals(uploadArchiveRequest.getChecksum()))) {
-            throw new AmazonClientException("Mismatched checksums, passed in : " + uploadArchiveRequest.getChecksum());
-        }
-
-        if (uploadArchiveRequest.getContentLength() != srcFile.length()) {
-            throw new AmazonClientException("Mismatched content length : " + uploadArchiveRequest.getContentLength());
-        }
-        result.setArchiveId("mockAWSGlacierArchiveId");
-        result.setChecksum(fullFileChecksum);
-
-        return result;  //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public void setVaultNotifications(SetVaultNotificationsRequest setVaultNotificationsRequest) throws AmazonServiceException, AmazonClientException {
-        //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public CompleteMultipartUploadResult completeMultipartUpload(CompleteMultipartUploadRequest completeMultipartUploadRequest) throws AmazonServiceException, AmazonClientException {
-
-        numCompleteInvocations++;
-
-        File srcFile = new File(filePath);
-        long archiveSize = srcFile.length();
-        String fullFileChecksum = TreeHashGenerator.calculateTreeHash(srcFile);
-
-        if (!(fullFileChecksum.equals(completeMultipartUploadRequest.getChecksum()))) {
-            throw new AmazonClientException("Mismatched checksums, passed in : " + completeMultipartUploadRequest.getChecksum());
-        }
-
-        if (!completeMultipartUploadRequest.getArchiveSize().equals(""+srcFile.length())) {
-            throw new AmazonClientException("Mismatched total archive size : " + completeMultipartUploadRequest.getArchiveSize());
-        }
-
-        CompleteMultipartUploadResult result = new CompleteMultipartUploadResult();
-        result.setChecksum(fullFileChecksum);
-        result.setArchiveId("mockAWSGlacierArchiveId");
-
-        return result;
-    }
-
-    @Override
-    public UploadMultipartPartResult uploadMultipartPart(UploadMultipartPartRequest uploadMultipartPartRequest) throws AmazonServiceException, AmazonClientException {
-
-        numPartInvocations++;
-
-        String checksum = TreeHashGenerator.calculateTreeHash(uploadMultipartPartRequest.getBody());
-
-        if (!checksum.equals(uploadMultipartPartRequest.getChecksum())) {
-            throw new AmazonServiceException("Checksums do not match");
-        }
-
-        if (!UPLOAD_ID.equals(uploadMultipartPartRequest.getUploadId())) {
-            throw new AmazonServiceException("Unrecognized upload id = " + uploadMultipartPartRequest.getUploadId());
-        }
-
-        UploadMultipartPartResult result = new UploadMultipartPartResult().withChecksum(checksum);
-        return result;
-    }
-
-    @Override
-    public DescribeVaultResult describeVault(DescribeVaultRequest describeVaultRequest) throws AmazonServiceException, AmazonClientException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public void deleteVaultNotifications(DeleteVaultNotificationsRequest deleteVaultNotificationsRequest) throws AmazonServiceException, AmazonClientException {
-        //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public ListMultipartUploadsResult listMultipartUploads(ListMultipartUploadsRequest listMultipartUploadsRequest) throws AmazonServiceException, AmazonClientException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public void deleteVault(DeleteVaultRequest deleteVaultRequest) throws AmazonServiceException, AmazonClientException {
-        //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public void shutdown() {
-        //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public ResponseMetadata getCachedResponseMetadata(AmazonWebServiceRequest request) {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    public int getNumPartInvocations() {
-        return numPartInvocations;
-    }
-
-    public int getNumFullFileInvocations() {
-        return numFullFileInvocations;
-    }
-
-    public int getNumCompleteInvocations() {
-        return numCompleteInvocations;
     }
 }
