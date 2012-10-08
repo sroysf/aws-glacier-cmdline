@@ -130,6 +130,10 @@
 							<mainClass>com.codechronicle.aws.glacier.Main</mainClass>
 							<name>main</name>
 						</program>
+                        <program>
+                            <mainClass>com.codechronicle.aws.glacier.localtest.MainTestDriver</mainClass>
+                            <name>mainTestDriver</name>
+                        </program>
 					</programs>
 				</configuration>
 				<executions>

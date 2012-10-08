@@ -3,14 +3,13 @@ package com.codechronicle.aws.glacier.command;
 import com.amazonaws.services.glacier.TreeHashGenerator;
 import com.codechronicle.aws.glacier.AppConstants;
 import com.codechronicle.aws.glacier.EnvironmentConfiguration;
-import com.codechronicle.aws.glacier.MockGlacierClient;
+import com.codechronicle.aws.glacier.localtest.MockGlacierClient;
 import com.codechronicle.aws.glacier.TestFileGenerator;
 import com.codechronicle.aws.glacier.dbutil.HSQLDBUtil;
 import com.codechronicle.aws.glacier.event.Event;
 import com.codechronicle.aws.glacier.event.EventListener;
 import com.codechronicle.aws.glacier.event.EventRegistry;
 import com.codechronicle.aws.glacier.event.EventType;
-import com.codechronicle.aws.glacier.model.FileUploadRecord;
 import com.mchange.v2.c3p0.PooledDataSource;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterSuite;
@@ -32,14 +31,14 @@ import java.util.UUID;
  * Time: 4:57 PM
  * To change this template use File | Settings | File Templates.
  */
-public class PersistentUploadFileCommandTest {
+public class UploadFileCommandTest {
 
     private File largeFile;
     private File exactFile;
     private File smallFile;
     private PooledDataSource datasource;
     private EnvironmentConfiguration config;
-    private MockGlacierClient client = new MockGlacierClient();
+    private MockGlacierClient client = new MockGlacierClient(null);
 
     //TODO: Test all kinds of invalid inputs
     //TODO: Confirm database state after file uploads are complete
@@ -146,7 +145,7 @@ public class PersistentUploadFileCommandTest {
     }
 
     private void uploadFile(File file) {
-        PersistentUploadFileCommand cmd = new PersistentUploadFileCommand(config);
+        UploadFileCommand cmd = new UploadFileCommand(config);
         cmd.setFilePath(file.getAbsolutePath());
         cmd.setVault("testVault");
 

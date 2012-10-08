@@ -17,13 +17,13 @@ import java.io.File;
  * Time: 3:06 PM
  * To change this template use File | Settings | File Templates.
  */
-public class PersistentUploadFileCommand extends GlacierCommand {
+public class UploadFileCommand extends GlacierCommand {
 
-    private static Logger log = LoggerFactory.getLogger(PersistentUploadFileCommand.class);
+    private static Logger log = LoggerFactory.getLogger(UploadFileCommand.class);
     private String filePath;
     private String vault;
 
-    public PersistentUploadFileCommand(EnvironmentConfiguration config) {
+    public UploadFileCommand(EnvironmentConfiguration config) {
         super(config);
     }
 

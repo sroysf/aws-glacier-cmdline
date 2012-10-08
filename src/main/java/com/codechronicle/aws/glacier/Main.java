@@ -4,7 +4,7 @@ import com.amazonaws.services.glacier.AmazonGlacier;
 import com.codechronicle.aws.glacier.cmdline.CurrentDirAwareFileNameCompleter;
 import com.codechronicle.aws.glacier.command.CommandResultCode;
 import com.codechronicle.aws.glacier.command.ListUploadsCommand;
-import com.codechronicle.aws.glacier.command.PersistentUploadFileCommand;
+import com.codechronicle.aws.glacier.command.UploadFileCommand;
 import com.codechronicle.aws.glacier.dbutil.HSQLDBUtil;
 import com.codechronicle.aws.glacier.event.Event;
 import com.codechronicle.aws.glacier.event.EventListener;
@@ -14,7 +14,6 @@ import com.codechronicle.aws.glacier.model.FileUploadRecord;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
 import jline.console.ConsoleReader;
 import jline.console.completer.ArgumentCompleter;
-import jline.console.completer.FileNameCompleter;
 import jline.console.completer.StringsCompleter;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -53,8 +52,10 @@ public class Main {
             } else if (line.startsWith("upload ")) {
                 File uploadFile = new File(fileCompleter.getCurrentDirectory(), tokens[1]);
                 System.out.println("Uploading : " + uploadFile.getAbsolutePath());
-            } else if (line.startsWith("quit")) {
+            } else if (line.startsWith("quit ")) {
                 break;
+            } else if (line.startsWith("list")) {
+                System.out.println("Listing current uploads");
             }
         }
     }
@@ -141,7 +142,7 @@ public class Main {
                 }
             });
 
-            PersistentUploadFileCommand cmd = new PersistentUploadFileCommand(config);
+            UploadFileCommand cmd = new UploadFileCommand(config);
             cmd.setVault("PersonalMedia");
             cmd.setFilePath("/home/sroy/glacier/media-1997.tar.gpg");
             cmd.execute();

@@ -1,4 +1,4 @@
-package com.codechronicle.aws.glacier;
+package com.codechronicle.aws.glacier.localtest;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
@@ -14,11 +14,7 @@ import java.io.*;
 import java.util.*;
 
 /**
- * Created with IntelliJ IDEA.
- * User: sroy
- * Date: 9/7/12
- * Time: 5:00 PM
- * To change this template use File | Settings | File Templates.
+ * Provides a local implementation of the AWS Glacier client.
  */
 public class MockGlacierClient implements AmazonGlacier {
 
@@ -28,8 +24,13 @@ public class MockGlacierClient implements AmazonGlacier {
     private Map<String,InitiateMultipartUploadRequest> multiPartMap = new HashMap<String, InitiateMultipartUploadRequest>();
     private Map<String,List<UploadMultipartPartRequest>> inProgressPartsMap = new HashMap<String, List<UploadMultipartPartRequest>>();
 
-    public MockGlacierClient() {
-        tempUploadDirectory = new File(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
+    public MockGlacierClient(File uploadDirectory) {
+        if (uploadDirectory == null) {
+            tempUploadDirectory = new File(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
+        } else {
+            tempUploadDirectory = uploadDirectory;
+        }
+
         tempUploadDirectory.mkdirs();
         System.out.println("MockGlacierClient using upload directory : " + tempUploadDirectory.getAbsolutePath());
     }
@@ -37,7 +38,6 @@ public class MockGlacierClient implements AmazonGlacier {
     public void cleanup() throws IOException {
         FileUtils.deleteDirectory(tempUploadDirectory);
     }
-
 
     @Override
     public UploadArchiveResult uploadArchive(UploadArchiveRequest uploadArchiveRequest) throws AmazonServiceException, AmazonClientException {
