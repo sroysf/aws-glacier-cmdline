@@ -78,6 +78,9 @@ public class PersistentUploadFileCommand extends GlacierCommand {
         log.info("Saving new file upload entry for " + file.getAbsolutePath());
         fuDAO.create(fileUploadRecord);
 
+        getResult().setResultCode(CommandResultCode.SUCCESS);
+        getResult().setMessage("Successfully queued upload of file : " + file.getAbsolutePath());
+
         wakeWorkerThread();
     }
 

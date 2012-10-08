@@ -57,6 +57,24 @@ public class FileUploadRecordDAO extends BaseDAO {
         return records;
     }
 
+    public List<FileUploadRecord> findAll() throws SQLException {
+        List<FileUploadRecord> records = null;
+
+        records = getQueryRunner().query("SELECT * FROM UPLOAD ORDER BY id DESC", new ResultSetHandler<List<FileUploadRecord>>() {
+            @Override
+            public List<FileUploadRecord> handle(ResultSet rs) throws SQLException {
+                List<FileUploadRecord> results = new ArrayList<FileUploadRecord>();
+                while (rs.next()) {
+                    results.add(mapFileRecord(rs));
+                }
+                return results;
+            }
+        });
+
+        return records;
+    }
+
+
     private FileUploadRecord mapFileRecord(ResultSet rs) throws SQLException {
         FileUploadRecord record = new FileUploadRecord();
 

@@ -1,6 +1,8 @@
 package com.codechronicle.aws.glacier;
 
 import com.amazonaws.services.glacier.AmazonGlacier;
+import com.codechronicle.aws.glacier.command.CommandResultCode;
+import com.codechronicle.aws.glacier.command.ListUploadsCommand;
 import com.codechronicle.aws.glacier.command.PersistentUploadFileCommand;
 import com.codechronicle.aws.glacier.dbutil.HSQLDBUtil;
 import com.codechronicle.aws.glacier.event.Event;
@@ -17,6 +19,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.Properties;
 
 
@@ -26,6 +29,43 @@ public class Main {
 
 
     public static void main(String[] args) throws IOException {
+        Properties awsProps = new Properties();
+        awsProps.load(FileUtils.openInputStream(new File(System.getenv("HOME") + "/.aws/aws.properties")));
+
+        final AmazonGlacier client = AmazonGlacierClientFactory.getClient(awsProps);
+
+        ComboPooledDataSource dataSource = HSQLDBUtil.initializeDatabase(null);
+
+        try {
+
+            EnvironmentConfiguration config = new EnvironmentConfiguration();
+            config.setAwsProperties(awsProps);
+            config.setClient(client);
+            config.setDataSource(dataSource);
+
+            ListUploadsCommand cmd = new ListUploadsCommand(config);
+            cmd.execute();
+
+            if (cmd.getResult().getResultCode() == CommandResultCode.SUCCESS) {
+                SimpleDateFormat sdf = new SimpleDateFormat(AppConstants.DATE_FORMAT);
+
+                System.out.println("ID\t\tVault\t\tCreated\t\tStatus\t\tFile Path");
+                for (FileUploadRecord record : cmd.getRecords()) {
+                    System.out.println(record.getId() + "\t\t" + record.getVault() + "\t\t" + sdf.format(record.getCreationDate()) + "\t\t" + record.getStatus() + "\t\t" + record.getFilePath());
+                }
+            } else {
+                throw new RuntimeException("Error in command : " + cmd.getResult().getMessage());
+            }
+
+        } catch (Exception ex) {
+            log.error("Unexpected exception", ex);
+        } finally {
+            HSQLDBUtil.shutdownDatabase(dataSource);
+            dataSource.close();
+        }
+    }
+
+    public static void uploadFile(String[] args) throws IOException {
 
         Properties awsProps = new Properties();
         awsProps.load(FileUtils.openInputStream(new File(System.getenv("HOME") + "/.aws/aws.properties")));
