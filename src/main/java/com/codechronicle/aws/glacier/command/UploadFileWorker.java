@@ -290,9 +290,25 @@ public class UploadFileWorker implements Runnable {
         return awsUploadId;
     }
 
+    //**********************************
+    // Thread control
+
     private void waitForMoreWork() throws InterruptedException {
         synchronized (workerThreadMonitor) {
             workerThreadMonitor.wait();
+        }
+    }
+
+    private static Thread workerThread = null;
+
+    public static synchronized void startServicingUploadQueue(EnvironmentConfiguration config) throws InterruptedException {
+        if (UploadFileWorker.workerThread == null) {
+            UploadFileWorker.workerThread = new Thread(new UploadFileWorker(config));
+            UploadFileWorker.workerThread.start();
+        } else {
+            synchronized (UploadFileWorker.workerThreadMonitor) {
+                UploadFileWorker.workerThreadMonitor.notify();
+            }
         }
     }
 }

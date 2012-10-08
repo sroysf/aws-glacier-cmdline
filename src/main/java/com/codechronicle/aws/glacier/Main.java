@@ -1,6 +1,7 @@
 package com.codechronicle.aws.glacier;
 
 import com.amazonaws.services.glacier.AmazonGlacier;
+import com.codechronicle.aws.glacier.cmdline.CurrentDirAwareFileNameCompleter;
 import com.codechronicle.aws.glacier.command.CommandResultCode;
 import com.codechronicle.aws.glacier.command.ListUploadsCommand;
 import com.codechronicle.aws.glacier.command.PersistentUploadFileCommand;
@@ -11,6 +12,10 @@ import com.codechronicle.aws.glacier.event.EventRegistry;
 import com.codechronicle.aws.glacier.event.EventType;
 import com.codechronicle.aws.glacier.model.FileUploadRecord;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
+import jline.console.ConsoleReader;
+import jline.console.completer.ArgumentCompleter;
+import jline.console.completer.FileNameCompleter;
+import jline.console.completer.StringsCompleter;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +34,53 @@ public class Main {
 
 
     public static void main(String[] args) throws IOException {
+        ConsoleReader consoleReader = new ConsoleReader(System.in, System.out);
+
+        CurrentDirAwareFileNameCompleter fileCompleter = new CurrentDirAwareFileNameCompleter();
+        consoleReader.addCompleter(new ArgumentCompleter(new StringsCompleter("upload", "list", "cd", "quit"), fileCompleter));
+
+        while (true) {
+            String line = consoleReader.readLine(fileCompleter.getCurrentDirectory() + " > ");
+            System.out.println("Command: " + line);
+
+            String[] tokens = line.split(" ");
+
+            if (line.startsWith("cd ")) {
+                String newCurrentDir = changeDirectory(new File(fileCompleter.getCurrentDirectory()), line);
+                if (newCurrentDir != null) {
+                    fileCompleter.setCurrentDirectory(newCurrentDir);
+                }
+            } else if (line.startsWith("upload ")) {
+                File uploadFile = new File(fileCompleter.getCurrentDirectory(), tokens[1]);
+                System.out.println("Uploading : " + uploadFile.getAbsolutePath());
+            } else if (line.startsWith("quit")) {
+                break;
+            }
+        }
+    }
+
+    private static String changeDirectory(File workingDir, String line) {
+        String[] args = line.split(" ");
+        String requestedPath = args[1];
+
+        File f = null;
+        if (requestedPath.startsWith("/")) {
+            f = new File(requestedPath);
+        } else if (requestedPath.startsWith("~")) {
+            requestedPath = requestedPath.replaceAll("~", FileUtils.getUserDirectory() + "/");
+            f = new File(requestedPath);
+        } else {
+            f = new File(workingDir, requestedPath);
+        }
+
+        if (f.exists() && f.isDirectory()) {
+            return f.getAbsolutePath();
+        } else {
+            return null;
+        }
+    }
+
+    public static void listFiles(String[] args) throws IOException {
         Properties awsProps = new Properties();
         awsProps.load(FileUtils.openInputStream(new File(System.getenv("HOME") + "/.aws/aws.properties")));
 

@@ -19,8 +19,6 @@ import java.io.File;
  */
 public class PersistentUploadFileCommand extends GlacierCommand {
 
-    private static Thread workerThread;
-
     private static Logger log = LoggerFactory.getLogger(PersistentUploadFileCommand.class);
     private String filePath;
     private String vault;
@@ -85,14 +83,7 @@ public class PersistentUploadFileCommand extends GlacierCommand {
     }
 
     private synchronized void wakeWorkerThread() throws InterruptedException {
-        if (workerThread == null) {
-            workerThread = new Thread(new UploadFileWorker(getConfig()));
-            workerThread.start();
-        } else {
-            synchronized (UploadFileWorker.workerThreadMonitor) {
-                UploadFileWorker.workerThreadMonitor.notify();
-            }
-        }
+        UploadFileWorker.startServicingUploadQueue(getConfig());
     }
 
     private void validateInputFile(File file) {
