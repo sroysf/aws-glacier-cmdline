@@ -52,6 +52,7 @@ public class MainTestDriver {
             ex.printStackTrace();
         } finally {
             log.info("Cleaning up resources...");
+            dataSource.setAutoCommitOnClose(true);
             dataSource.close();
         }
 

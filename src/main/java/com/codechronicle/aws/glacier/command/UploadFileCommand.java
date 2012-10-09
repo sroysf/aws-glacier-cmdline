@@ -40,7 +40,9 @@ public class UploadFileCommand extends GlacierCommand {
 
         File file = new File(filePath);
 
-        validateInputFile(file);
+        if (!validateInputFile(file)) {
+            return;
+        }
 
         // First calculate treehash of entire file
         String fileHash = TreeHashGenerator.calculateTreeHash(file);
@@ -86,17 +88,19 @@ public class UploadFileCommand extends GlacierCommand {
         UploadFileWorker.startServicingUploadQueue(getConfig());
     }
 
-    private void validateInputFile(File file) {
+    private boolean validateInputFile(File file) {
         if (!file.exists()) {
             getResult().setResultCode(CommandResultCode.FILE_NOT_FOUND);
             getResult().setMessage(file.getAbsolutePath());
-            return;
+            return false;
         }
 
         if (!file.canRead()) {
             getResult().setResultCode(CommandResultCode.FILE_UNREADABLE);
             getResult().setMessage(file.getAbsolutePath());
-            return;
+            return false;
         }
+
+        return true;
     }
 }

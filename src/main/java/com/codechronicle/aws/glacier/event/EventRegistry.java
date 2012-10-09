@@ -46,8 +46,10 @@ public class EventRegistry {
 
     public synchronized static void publish (Event event) {
         List<EventListener> listeners = getListeners(event.getEventType());
-        for (EventListener listener : listeners) {
-            listener.onEvent(event);
+        if (listeners != null) {
+            for (EventListener listener : listeners) {
+                listener.onEvent(event);
+            }
         }
     }
 
