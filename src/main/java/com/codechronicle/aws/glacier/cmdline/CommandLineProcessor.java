@@ -51,12 +51,33 @@ public class CommandLineProcessor {
             } else if (line.startsWith("upload ")) {
                 executeUploadFileCommand(fileCompleter.getCurrentDirectory(), tokens);
             } else if (line.startsWith("quit")) {
+                cleanup();
                 break;
             } else if (line.startsWith("list")) {
                 executeListUploadsCommand();
             } else if (line.startsWith("details")) {
                 executeGetUploadDetailsCommand(tokens);
+            } else if (line.startsWith("start-uploads")) {
+                startUploads();
+            } else if (line.startsWith("stop-uploads")) {
+                stopUploads();
             }
+        }
+    }
+
+    private void cleanup() {
+        stopUploads();
+    }
+
+    private void stopUploads() {
+        UploadFileWorker.stopServicingUploadQueue();
+    }
+
+    private void startUploads() {
+        try {
+            UploadFileWorker.startServicingUploadQueue(config);
+        } catch (InterruptedException e) {
+            System.out.println("Upload processing unexpectedly terminated");
         }
     }
 
@@ -166,6 +187,8 @@ public class CommandLineProcessor {
         commands.add("quit");
         commands.add("help");
         commands.add("details");
+        commands.add("start-uploads");
+        commands.add("stop-uploads");
 
         return commands;
     }
