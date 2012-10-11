@@ -147,11 +147,11 @@ public class UploadFileWorker implements Runnable {
     private void processMultiPartUpload(FileUploadRecord uploadFile) throws SQLException, IOException {
         log.info("Continuing multi-part upload of file : " + uploadFile.getFilePath());
 
-        // Look in parts table to determine the next part to upload
+        // Look in completedParts table to determine the next part to upload
         FileUploadPartDAO fupDAO = new FileUploadPartDAO(config.getDataSource());
         int maxPartUploaded = fupDAO.findMaxSuccessfulPartNumber(uploadFile.getId());
 
-        // Calculate number of parts that should be in the file
+        // Calculate number of completedParts that should be in the file
         int numTotalParts = calculateTotalParts(uploadFile);
 
         while (maxPartUploaded < numTotalParts) {
@@ -190,7 +190,7 @@ public class UploadFileWorker implements Runnable {
         FileUploadPartDAO fupDAO = new FileUploadPartDAO(config.getDataSource());
         List<FileUploadPart> parts = fupDAO.findParts(uploadFile);
 
-        log.info("Verifying parts for " + uploadFile.getFilePath());
+        log.info("Verifying completedParts for " + uploadFile.getFilePath());
         long bytes = 0;
         for (FileUploadPart part : parts) {
             bytes += part.getEndByte() - part.getStartByte() + 1;
@@ -198,7 +198,7 @@ public class UploadFileWorker implements Runnable {
         }
 
         if (bytes != uploadFile.getLength()) {
-            throw new RuntimeException("Byte count mismatch. Sum of parts = " + bytes + " bytes, but file length is " + uploadFile.getLength());
+            throw new RuntimeException("Byte count mismatch. Sum of completedParts = " + bytes + " bytes, but file length is " + uploadFile.getLength());
         }
     }
 
@@ -309,6 +309,12 @@ public class UploadFileWorker implements Runnable {
             synchronized (UploadFileWorker.workerThreadMonitor) {
                 UploadFileWorker.workerThreadMonitor.notify();
             }
+        }
+    }
+
+    public static synchronized void stopServicingUploadQueue() {
+        if (UploadFileWorker.workerThread != null) {
+            UploadFileWorker.workerThread.interrupt();
         }
     }
 }

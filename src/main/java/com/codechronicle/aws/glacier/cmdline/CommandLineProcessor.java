@@ -1,9 +1,9 @@
 package com.codechronicle.aws.glacier.cmdline;
 
+import com.codechronicle.aws.glacier.AppConstants;
 import com.codechronicle.aws.glacier.EnvironmentConfiguration;
-import com.codechronicle.aws.glacier.command.CommandResultCode;
-import com.codechronicle.aws.glacier.command.ListUploadsCommand;
-import com.codechronicle.aws.glacier.command.UploadFileCommand;
+import com.codechronicle.aws.glacier.command.*;
+import com.codechronicle.aws.glacier.model.FileUploadPart;
 import com.codechronicle.aws.glacier.model.FileUploadRecord;
 import jline.console.ConsoleReader;
 import jline.console.completer.ArgumentCompleter;
@@ -12,6 +12,7 @@ import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -53,8 +54,45 @@ public class CommandLineProcessor {
                 break;
             } else if (line.startsWith("list")) {
                 executeListUploadsCommand();
+            } else if (line.startsWith("details")) {
+                executeGetUploadDetailsCommand(tokens);
             }
         }
+    }
+
+    private void executeGetUploadDetailsCommand(String[] tokens) {
+
+        String usage = "Usage : details <fileUploadId>";
+        if (tokens.length < 2) {
+            System.out.println(usage);
+            return;
+        }
+
+        try {
+            int id = Integer.parseInt(tokens[1]);
+            GetUploadDetailsCommand cmd = new GetUploadDetailsCommand(config, id);
+            cmd.execute();
+
+            if (cmd.getResult().getResultCode() == CommandResultCode.SUCCESS) {
+                List<FileUploadPart> parts = cmd.getCompletedParts();
+                SimpleDateFormat sdf = new SimpleDateFormat(AppConstants.DATE_FORMAT);
+                for (FileUploadPart part : parts) {
+                    System.out.println(part.getPartNum() + "\t\t" + part.getStartByte() + "-" + part.getEndByte() + "\t\t" + sdf.format(part.getCompletionDate()));
+                }
+
+                System.out.println("\nPercent complete = " + cmd.getPercentComplete() + "% [" + cmd.getLastByteUploaded() + " / " + cmd.getFileUploadRecord().getLength() + "]");
+
+            } else {
+                printCommandError(cmd);
+            }
+        } catch (NumberFormatException nfe) {
+            System.out.println(usage);
+            return;
+        }
+    }
+
+    private void printCommandError(GlacierCommand cmd) {
+        System.out.println("Error : " + cmd.getResult().getResultCode() + " -> " + cmd.getResult().getMessage());
     }
 
     private void executeListUploadsCommand() {
@@ -66,7 +104,7 @@ public class CommandLineProcessor {
                 System.out.println(record.getId() + "\t" + record.getVault() + "\t" + record.getStatus() + "\t" + record.getAwsArchiveId() + "\t" + record.getFilePath() );
             }
         } else {
-            System.out.println("Error : " + cmd.getResult().getResultCode() + " -> " + cmd.getResult().getMessage());
+            printCommandError(cmd);
         }
     }
 
@@ -115,7 +153,7 @@ public class CommandLineProcessor {
                 System.out.println("File queued for upload : " + uploadFile.getAbsolutePath());
                 break;
             default:
-                System.out.println("Error : " + message);
+                printCommandError(cmd);
         }
     }
 
@@ -127,6 +165,7 @@ public class CommandLineProcessor {
         commands.add("cd");
         commands.add("quit");
         commands.add("help");
+        commands.add("details");
 
         return commands;
     }

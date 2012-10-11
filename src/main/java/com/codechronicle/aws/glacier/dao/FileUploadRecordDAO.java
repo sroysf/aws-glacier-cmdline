@@ -57,6 +57,23 @@ public class FileUploadRecordDAO extends BaseDAO {
         return records;
     }
 
+    public FileUploadRecord findById(int id) throws SQLException {
+        FileUploadRecord record = null;
+
+        record = getQueryRunner().query("SELECT * FROM UPLOAD WHERE id=?", new ResultSetHandler<FileUploadRecord>() {
+            @Override
+            public FileUploadRecord handle(ResultSet rs) throws SQLException {
+                if (rs.next()) {
+                    return mapFileRecord(rs);
+                } else {
+                    return null;
+                }
+            }
+        }, id);
+
+        return record;
+    }
+
     public List<FileUploadRecord> findAll() throws SQLException {
         List<FileUploadRecord> records = null;
 

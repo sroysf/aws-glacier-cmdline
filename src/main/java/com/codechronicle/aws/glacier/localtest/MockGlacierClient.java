@@ -20,6 +20,7 @@ public class MockGlacierClient implements AmazonGlacier {
 
     public static final String UPLOAD_ID = "testJobId";
     private File tempUploadDirectory;
+    private int uploadTimePerPart = 0;
 
     private Map<String,InitiateMultipartUploadRequest> multiPartMap = new HashMap<String, InitiateMultipartUploadRequest>();
     private Map<String,List<UploadMultipartPartRequest>> inProgressPartsMap = new HashMap<String, List<UploadMultipartPartRequest>>();
@@ -37,6 +38,10 @@ public class MockGlacierClient implements AmazonGlacier {
 
     public void cleanup() throws IOException {
         FileUtils.deleteDirectory(tempUploadDirectory);
+    }
+
+    public void setUploadTimePerPart(int uploadTimePerPart) {
+        this.uploadTimePerPart = uploadTimePerPart;
     }
 
     @Override
@@ -206,6 +211,13 @@ public class MockGlacierClient implements AmazonGlacier {
         }
 
         result.setChecksum(checksum);
+
+        // Simulate an upload time delay
+        try {
+            Thread.sleep(this.uploadTimePerPart * 1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+        }
 
         return result;
     }

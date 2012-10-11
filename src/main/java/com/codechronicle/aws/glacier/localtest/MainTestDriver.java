@@ -37,6 +37,7 @@ public class MainTestDriver {
 
         final MockGlacierClient client = new MockGlacierClient(mockAWSDir);
         ComboPooledDataSource dataSource = HSQLDBUtil.initializeDatabase(dbDir);
+        client.setUploadTimePerPart(10);
 
         EnvironmentConfiguration config = new EnvironmentConfiguration();
         config.setAwsProperties(awsProps);

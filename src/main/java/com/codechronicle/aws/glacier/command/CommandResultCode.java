@@ -12,5 +12,6 @@ public enum CommandResultCode {
     UNEXPECTED_ERROR,
     FILE_NOT_FOUND,
     FILE_UNREADABLE,
+    RECORD_NOT_FOUND,
     UPLOAD_ALREADY_EXISTS
 }
