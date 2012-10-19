@@ -35,8 +35,6 @@ import java.util.List;
 public class UploadFileWorker implements Runnable {
 
     private static Logger log = LoggerFactory.getLogger(UploadFileWorker.class);
-    public static Object workerThreadMonitor = new Object();
-
     private EnvironmentConfiguration config;
 
     public UploadFileWorker(EnvironmentConfiguration config) {
@@ -49,7 +47,7 @@ public class UploadFileWorker implements Runnable {
         FileUploadRecordDAO fuDAO = new FileUploadRecordDAO(config.getDataSource());
 
         try {
-            while (true) {
+            while (!terminateFlag) {
 
                 // Start with in-progress uploads, FIFO servicing
                 List<FileUploadRecord> inProgressFiles = fuDAO.findByStatus(FileUploadStatus.IN_PROGRESS);
@@ -58,17 +56,30 @@ public class UploadFileWorker implements Runnable {
                 // Then work on pending uploads, FIFO servicing
                 List<FileUploadRecord> pendingFiles = fuDAO.findByStatus(FileUploadStatus.PENDING);
                 serviceUploads(pendingFiles);
-
-                // No more work to do right now, go to sleep and wait
-                waitForMoreWork();
             }
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
+
+        cleanup();
+
+        log.info("Upload file background activity halted");
+    }
+
+    private void cleanup() {
+        UploadFileWorker.workerThread = null;
+        try {
+            config.getDataSource().getConnection().commit();
+        } catch (SQLException e) {
+            log.warn("Unexpected SQL exception", e);
+        }
     }
 
     private void serviceUploads(List<FileUploadRecord> uploadFiles) throws SQLException, IOException {
+
         for (FileUploadRecord uploadFile : uploadFiles) {
+            if (terminateFlag) return;
+
             log.info("Processing file : " + uploadFile.getFilePath());
 
             if (uploadFile.getStatus() == FileUploadStatus.PENDING) {
@@ -80,6 +91,8 @@ public class UploadFileWorker implements Runnable {
     }
 
     private void processInProgressUpload(FileUploadRecord uploadFile) throws SQLException, IOException {
+        if (terminateFlag) return;
+
         if (uploadFile.getLength() < AppConstants.NETWORK_PARTITION_SIZE) {
             processEntireFileUpload(uploadFile);
         } else {
@@ -88,6 +101,8 @@ public class UploadFileWorker implements Runnable {
     }
 
     private void processPendingUpload(FileUploadRecord uploadFile) throws SQLException, IOException {
+
+        if (terminateFlag) return;
 
         FileUploadRecordDAO fuDAO = new FileUploadRecordDAO(config.getDataSource());
         uploadFile.setStatus(FileUploadStatus.IN_PROGRESS);
@@ -145,16 +160,20 @@ public class UploadFileWorker implements Runnable {
     }
 
     private void processMultiPartUpload(FileUploadRecord uploadFile) throws SQLException, IOException {
+        if (terminateFlag) return;
         log.info("Continuing multi-part upload of file : " + uploadFile.getFilePath());
 
         // Look in completedParts table to determine the next part to upload
         FileUploadPartDAO fupDAO = new FileUploadPartDAO(config.getDataSource());
         int maxPartUploaded = fupDAO.findMaxSuccessfulPartNumber(uploadFile.getId());
+        log.info("Max part number successfully uploaded previously = " + maxPartUploaded);
 
         // Calculate number of completedParts that should be in the file
         int numTotalParts = calculateTotalParts(uploadFile);
 
         while (maxPartUploaded < numTotalParts) {
+            if (terminateFlag) return;
+
             uploadPart(uploadFile, ++maxPartUploaded);
         }
 
@@ -293,28 +312,37 @@ public class UploadFileWorker implements Runnable {
     //**********************************
     // Thread control
 
-    private void waitForMoreWork() throws InterruptedException {
-        synchronized (workerThreadMonitor) {
-            workerThreadMonitor.wait();
-        }
-    }
-
     private static Thread workerThread = null;
+    private static boolean terminateFlag = false;
 
     public static synchronized void startServicingUploadQueue(EnvironmentConfiguration config) throws InterruptedException {
+
+        if ((UploadFileWorker.workerThread != null) && (UploadFileWorker.workerThread.isAlive())) {
+            // Thread is still alive, simply remove the terminate flag.
+            terminateFlag = false;
+            return;
+        }
+
         if (UploadFileWorker.workerThread == null) {
+            UploadFileWorker.terminateFlag = false;
             UploadFileWorker.workerThread = new Thread(new UploadFileWorker(config));
             UploadFileWorker.workerThread.start();
-        } else {
-            synchronized (UploadFileWorker.workerThreadMonitor) {
-                UploadFileWorker.workerThreadMonitor.notify();
-            }
         }
     }
 
     public static synchronized void stopServicingUploadQueue() {
         if (UploadFileWorker.workerThread != null) {
-            UploadFileWorker.workerThread.interrupt();
+            UploadFileWorker.terminateFlag = true;
+        }
+    }
+
+    public static synchronized void waitForWorkerThread() {
+        if (UploadFileWorker.workerThread != null) {
+            try {
+                UploadFileWorker.workerThread.join();
+            } catch (InterruptedException e) {
+                log.warn("Unexpected worker thead interruption", e);
+            }
         }
     }
 }

@@ -67,6 +67,7 @@ public class CommandLineProcessor {
 
     private void cleanup() {
         stopUploads();
+        UploadFileWorker.waitForWorkerThread();
     }
 
     private void stopUploads() {

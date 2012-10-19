@@ -26,7 +26,7 @@ public class FileUploadPartDAO extends BaseDAO {
 
     public int findMaxSuccessfulPartNumber(int fileUploadId) throws SQLException {
 
-        int maxPartNum = getQueryRunner().query("SELECT MAX(partNum) AS maxPartNum FROM PUBLIC.UPLOAD_PART WHERE id=?", new ResultSetHandler<Integer>() {
+        int maxPartNum = getQueryRunner().query("SELECT MAX(partNum) AS maxPartNum FROM PUBLIC.UPLOAD_PART WHERE uploadId=?", new ResultSetHandler<Integer>() {
             @Override
             public Integer handle(ResultSet rs) throws SQLException {
                 if (rs.next()) {
@@ -48,6 +48,8 @@ public class FileUploadPartDAO extends BaseDAO {
                 part.getEndByte(),
                 part.getPartHash(),
                 new GregorianCalendar().getTime());
+        System.out.println("Created part number record for part num = " + part.getPartNum());
+
     }
 
     public List<FileUploadPart> findParts(FileUploadRecord fileUploadRecord) throws SQLException {

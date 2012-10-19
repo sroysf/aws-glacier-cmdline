@@ -37,7 +37,9 @@ public class MainTestDriver {
 
         final MockGlacierClient client = new MockGlacierClient(mockAWSDir);
         ComboPooledDataSource dataSource = HSQLDBUtil.initializeDatabase(dbDir);
-        client.setUploadTimePerPart(10);
+        dataSource.setAutoCommitOnClose(true);
+
+        client.setUploadTimePerPart(5);
 
         EnvironmentConfiguration config = new EnvironmentConfiguration();
         config.setAwsProperties(awsProps);
@@ -48,12 +50,10 @@ public class MainTestDriver {
 
             CommandLineProcessor clp = new CommandLineProcessor(config);
             clp.startProcessingUserInput();
-
         } catch (Exception ex) {
             ex.printStackTrace();
         } finally {
-            log.info("Cleaning up resources...");
-            dataSource.setAutoCommitOnClose(true);
+            HSQLDBUtil.shutdownDatabase(dataSource);
             dataSource.close();
         }
 
