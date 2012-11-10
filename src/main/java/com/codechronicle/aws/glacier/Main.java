@@ -1,176 +1,117 @@
 package com.codechronicle.aws.glacier;
 
+
 import com.amazonaws.services.glacier.AmazonGlacier;
-import com.codechronicle.aws.glacier.cmdline.CurrentDirAwareFileNameCompleter;
-import com.codechronicle.aws.glacier.command.CommandResultCode;
-import com.codechronicle.aws.glacier.command.ListUploadsCommand;
-import com.codechronicle.aws.glacier.command.UploadFileCommand;
+import com.amazonaws.services.glacier.AmazonGlacierClient;
+import com.codechronicle.aws.glacier.EnvironmentConfiguration;
+import com.codechronicle.aws.glacier.cmdline.CommandLineProcessor;
 import com.codechronicle.aws.glacier.dbutil.HSQLDBUtil;
-import com.codechronicle.aws.glacier.event.Event;
-import com.codechronicle.aws.glacier.event.EventListener;
-import com.codechronicle.aws.glacier.event.EventRegistry;
-import com.codechronicle.aws.glacier.event.EventType;
-import com.codechronicle.aws.glacier.model.FileUploadRecord;
+import com.codechronicle.aws.glacier.localtest.MockGlacierClient;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
-import jline.console.ConsoleReader;
-import jline.console.completer.ArgumentCompleter;
-import jline.console.completer.StringsCompleter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.text.SimpleDateFormat;
 import java.util.Properties;
 
-
+/**
+ *
+ * Requires ~/.aws/aws.properties
+ *
+ * AWS Properties file contents:
+ * accountId=
+ * canonicalUserId=
+ * endPoint=glacier.us-west-2.amazonaws.com
+ * accessKey=
+ * secretKey=
+ *
+ */
 public class Main {
 
     private static Logger log = LoggerFactory.getLogger(Main.class);
 
+    public static void main(String[] args) {
 
-    public static void main(String[] args) throws IOException {
-        ConsoleReader consoleReader = new ConsoleReader(System.in, System.out);
-
-        CurrentDirAwareFileNameCompleter fileCompleter = new CurrentDirAwareFileNameCompleter();
-        consoleReader.addCompleter(new ArgumentCompleter(new StringsCompleter("upload", "list", "cd", "quit"), fileCompleter));
-
-        while (true) {
-            String line = consoleReader.readLine(fileCompleter.getCurrentDirectory() + " > ");
-            System.out.println("Command: " + line);
-
-            String[] tokens = line.split(" ");
-
-            if (line.startsWith("cd ")) {
-                String newCurrentDir = changeDirectory(new File(fileCompleter.getCurrentDirectory()), line);
-                if (newCurrentDir != null) {
-                    fileCompleter.setCurrentDirectory(newCurrentDir);
-                }
-            } else if (line.startsWith("upload ")) {
-                File uploadFile = new File(fileCompleter.getCurrentDirectory(), tokens[1]);
-                System.out.println("Uploading : " + uploadFile.getAbsolutePath());
-            } else if (line.startsWith("quit ")) {
-                break;
-            } else if (line.startsWith("list")) {
-                System.out.println("Listing current uploads");
-            }
-        }
-    }
-
-    private static String changeDirectory(File workingDir, String line) {
-        String[] args = line.split(" ");
-        String requestedPath = args[1];
-
-        File f = null;
-        if (requestedPath.startsWith("/")) {
-            f = new File(requestedPath);
-        } else if (requestedPath.startsWith("~")) {
-            requestedPath = requestedPath.replaceAll("~", FileUtils.getUserDirectory() + "/");
-            f = new File(requestedPath);
-        } else {
-            f = new File(workingDir, requestedPath);
-        }
-
-        if (f.exists() && f.isDirectory()) {
-            return f.getAbsolutePath();
-        } else {
-            return null;
-        }
-    }
-
-    public static void listFiles(String[] args) throws IOException {
-        Properties awsProps = new Properties();
-        awsProps.load(FileUtils.openInputStream(new File(System.getenv("HOME") + "/.aws/aws.properties")));
-
-        final AmazonGlacier client = AmazonGlacierClientFactory.getClient(awsProps);
-
+        // Use default behavior of HSQLDBUtil
         ComboPooledDataSource dataSource = HSQLDBUtil.initializeDatabase(null);
 
         try {
+            Properties awsProps = loadAWSPropertiesFromDefaultFile();
+
+            dataSource.setAutoCommitOnClose(true);
+
+            AmazonGlacier client = AmazonGlacierClientFactory.getClient(awsProps);
 
             EnvironmentConfiguration config = new EnvironmentConfiguration();
             config.setAwsProperties(awsProps);
             config.setClient(client);
             config.setDataSource(dataSource);
 
-            ListUploadsCommand cmd = new ListUploadsCommand(config);
-            cmd.execute();
+            CommandLineProcessor clp = new CommandLineProcessor(config);
+            clp.startProcessingUserInput();
 
-            if (cmd.getResult().getResultCode() == CommandResultCode.SUCCESS) {
-                SimpleDateFormat sdf = new SimpleDateFormat(AppConstants.DATE_FORMAT);
-
-                System.out.println("ID\t\tVault\t\tCreated\t\tStatus\t\tFile Path");
-                for (FileUploadRecord record : cmd.getRecords()) {
-                    System.out.println(record.getId() + "\t\t" + record.getVault() + "\t\t" + sdf.format(record.getCreationDate()) + "\t\t" + record.getStatus() + "\t\t" + record.getFilePath());
-                }
-            } else {
-                throw new RuntimeException("Error in command : " + cmd.getResult().getMessage());
-            }
-
-        } catch (Exception ex) {
-            log.error("Unexpected exception", ex);
+        } catch (Exception e) {
+            log.error("Unexpected error : " + e);
+            System.out.println(e.getMessage());
         } finally {
             HSQLDBUtil.shutdownDatabase(dataSource);
             dataSource.close();
         }
+
     }
 
-    public static void uploadFile(String[] args) throws IOException {
-
-        Properties awsProps = new Properties();
-        awsProps.load(FileUtils.openInputStream(new File(System.getenv("HOME") + "/.aws/aws.properties")));
-
-        final AmazonGlacier client = AmazonGlacierClientFactory.getClient(awsProps);
+    /*public static void mainX(String[] args) {
 
         ComboPooledDataSource dataSource = HSQLDBUtil.initializeDatabase(null);
-
         try {
+
+            Properties awsProps = loadAWSPropertiesFromDefaultFile();
+
+            dataSource.setAutoCommitOnClose(true);
+
+            client.setUploadTimePerPart(5);
 
             EnvironmentConfiguration config = new EnvironmentConfiguration();
             config.setAwsProperties(awsProps);
             config.setClient(client);
             config.setDataSource(dataSource);
 
-            EventRegistry.register(EventType.UPLOAD_COMPLETE, new EventListener() {
-                @Override
-                public void onEvent(Event event) {
-                    FileUploadRecord record = (FileUploadRecord)event.getMessagePayload();
-                    log.info("Completed upload of file : " + record.getFilePath());
-                }
-            });
-
-            UploadFileCommand cmd = new UploadFileCommand(config);
-            cmd.setVault("PersonalMedia");
-            cmd.setFilePath("/home/sroy/glacier/media-1997.tar.gpg");
-            cmd.execute();
-
-            doKeyBoardInputLoop();
-
+            CommandLineProcessor clp = new CommandLineProcessor(config);
+            clp.startProcessingUserInput();
         } catch (Exception ex) {
-            log.error("Unexpected exception", ex);
+            ex.printStackTrace();
         } finally {
             HSQLDBUtil.shutdownDatabase(dataSource);
             dataSource.close();
         }
-    }
 
-    public static void doKeyBoardInputLoop() throws IOException {
-        String curLine = ""; // Line read from standard in
+        log.info("Exiting...");
+    }*/
 
-        System.out.println("Enter a line of text (type 'quit' to exit): ");
-        InputStreamReader converter = new InputStreamReader(System.in);
-        BufferedReader in = new BufferedReader(converter);
+    private static Properties loadAWSPropertiesFromDefaultFile() throws FileNotFoundException {
+        File propsFile = new File(new File(FileUtils.getUserDirectory(), ".aws"), "aws.properties");
+        System.out.println(propsFile.getAbsolutePath());
 
-        while (!(curLine.equals("quit"))){
-            curLine = in.readLine();
-
-            if (!(curLine.equals("quit"))){
-                System.out.println("You typed: " + curLine);
-            }
+        if (!(propsFile.exists() && propsFile.canRead())) {
+            throw new FileNotFoundException("Unable to read Amazon Web Services configuration from : " + propsFile.getAbsolutePath());
         }
-    }
 
+        Properties props = new Properties();
+        FileInputStream fis = null;
+        try {
+            fis = FileUtils.openInputStream(propsFile);
+            props.load(fis);
+        } catch (IOException e) {
+            log.error("Unable to read file", e);
+        } finally {
+            IOUtils.closeQuietly(fis);
+        }
+
+        return props;
+    }
 }

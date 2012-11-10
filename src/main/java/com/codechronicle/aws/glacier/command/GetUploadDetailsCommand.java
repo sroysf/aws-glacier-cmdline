@@ -50,7 +50,7 @@ public class GetUploadDetailsCommand extends GlacierCommand {
 
             FileUploadPart lastPart = this.completedParts.get(completedParts.size()-1);
             lastByteUploaded = lastPart.getEndByte();
-            percentComplete = (lastByteUploaded / fileUploadRecord.getLength()) * 100;
+            percentComplete = ((float)lastByteUploaded / (float)fileUploadRecord.getLength()) * 100;
         }
     }
 

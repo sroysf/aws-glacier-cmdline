@@ -24,6 +24,11 @@ public class HSQLDBUtil {
 
     private static Logger log = LoggerFactory.getLogger(HSQLDBUtil.class);
 
+    /**
+     *
+     * @param workingDirectory If specified, database directory will be created under this directory. Default = ~/.glacier/hsqldb
+     * @return
+     */
     public static ComboPooledDataSource initializeDatabase(File workingDirectory) {
         if (workingDirectory == null) {
             workingDirectory = new File(System.getenv("HOME") + "/.glacier/hsqldb");

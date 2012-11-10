@@ -225,7 +225,7 @@ public class UploadFileWorker implements Runnable {
         FileUploadPart part = new FileUploadPart();
         part.setUploadId(uploadFile.getId());
 
-        long startByte = (partNum-1) * AppConstants.NETWORK_PARTITION_SIZE;
+        long startByte = ((long)partNum-1) * AppConstants.NETWORK_PARTITION_SIZE;
         long endByte = startByte + AppConstants.NETWORK_PARTITION_SIZE - 1;
 
         if (endByte > uploadFile.getLength()) {
@@ -274,9 +274,14 @@ public class UploadFileWorker implements Runnable {
         int numBytes = (int)((endByte-startByte)+1);
         byte[] buffer = new byte[numBytes];
 
-        RandomAccessFile raf = new RandomAccessFile(new File(filePath), "r");
-        raf.seek(startByte);
-        raf.read(buffer, 0, numBytes);
+        RandomAccessFile raf = null;
+        try {
+            raf = new RandomAccessFile(new File(filePath), "r");
+            raf.seek(startByte);
+            raf.read(buffer, 0, numBytes);
+        } finally {
+            raf.close();
+        }
 
         System.out.println("Loading number of bytes = " + numBytes);
         System.out.println("Partition size = " + AppConstants.NETWORK_PARTITION_SIZE);
