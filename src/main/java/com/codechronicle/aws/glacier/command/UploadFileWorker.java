@@ -279,8 +279,12 @@ public class UploadFileWorker implements Runnable {
             raf = new RandomAccessFile(new File(filePath), "r");
             raf.seek(startByte);
             raf.read(buffer, 0, numBytes);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
         } finally {
-            raf.close();
+            if (raf != null) {
+                raf.close();
+            }
         }
 
         System.out.println("Loading number of bytes = " + numBytes);
